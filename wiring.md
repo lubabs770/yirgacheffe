@@ -91,7 +91,7 @@ Path per load: Line → SSR → load → Neutral.
 Feed all three SSR term-1 from the same acl (Line) bus.
 
 Per-load hot wire (your legend):
-- Heater  hot wire = ______
+- Heater  hot wire = **red** (→ SSR term 2). Heater **blue** → acn (Neutral) direct. Resistive/non-polar; red chosen as switched leg per factory relay note.
 - Pump    hot wire = ______
 - Grinder hot wire = ______
 
