@@ -28,10 +28,22 @@ factory relays. No triac for now → pump speed stays fixed, but flow *measureme
 | Heater | relay (big, red wire to metal base) ✅ | GPIO25 | slow-PWM for temp control |
 | Pump motor | acmot1 or acmot2 ❓ | GPIO26 | which acmot is pump vs grinder TBD (settle in firmware) |
 | Grinder motor | acmot1 or acmot2 ❓ | GPIO27 | " |
-| Steam gate | none / rides grinder 🟡 | — | metal plate over grind chute; likely mechanical or solenoid-on-grinder. Not a separate axis. |
+| Steam cover | **motorized** ✅ | GPIO32 (+GPIO33 in) | **NEW 4th axis.** Motor thingy that slides the cover open/closed over the steam. red/black = motor drive; blue/blue = position/limit switch (🟡, confirm). Motor AC-synchronous vs DC-reversible TBD → driver = 4th SSR or H-bridge. Phase-lock to grind/brew. |
 
 Mains: **acl / acn** = Line / Neutral ("wire to wall").
 Board has 3 relays total (2 heater-related, per red/blue-wire-to-metal-base notes).
+
+### Top-casing teardown finds (2026-07-26)
+Removed top casing (screws on top).
+- **Steam cover is motorized** — reclassified from passive gate to a 4th
+  controllable axis. "Funny motor": likely AC synchronous gearmotor (one-way,
+  cam + limit switch) — confirm type at bench.
+  - red/black pair = motor winding (steady Ω).
+  - blue/blue pair = limit/position switch (flips 0↔OL when cover moved by hand).
+- Main AC motor uses a **red/black** wire pair (which of pump/grinder = TBD).
+- **4-white-wire "safety" = thermal cutoff / high-limit — KEEP.** Wire in series
+  in heater mains Line leg, upstream of heater SSR. Hardware backstop; do not junk.
+- 3-wire to button PCB = factory UI, junk OK (ESP replaces).
 
 ---
 
@@ -89,6 +101,8 @@ Switches (sw1/sw2) were factory buttons/interlocks — not needed, ESP replaces 
 3. **Float (red 3-wire):** confirm open/closed logic when tank empty vs float raised; ID the 3 wires.
 4. **Ntc1:** record room-temp Ω value → firmware calibration.
 5. **acmot1 vs acmot2:** which is pump, which grinder (can defer to firmware — fire each, watch which spins).
+6. **Steam cover motor:** confirm red/black=winding vs blue/blue=switch (Ω per pair; switch flips when cover moved by hand). Classify motor AC vs DC (winding Ω + markings) → picks 4th-SSR vs H-bridge driver.
+7. **4-white safety cutoff:** confirm it's thermal (high-limit) → keep in series in heater mains Line, upstream of heater SSR.
 
 ## Working mode
 Async: **talk → commute → bench.** Discussion happens away from machine; physical
