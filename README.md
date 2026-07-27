@@ -22,6 +22,12 @@ Two tiers:
 Factory MCU stays physically in place; its 3 relay-drive lines are severed and
 ESP GPIO is injected instead.
 
+**Roadmap:** a Raspberry Pi is the *eventual* second tier on top of the ESP32 —
+for logging, brew profiles, and **real-time streamed control** (live telemetry
+out, time-varying setpoint/profile stream in). The ESP32 always holds the
+real-time loop and fails safe if the stream drops. Full design in
+[`docs/architecture.md`](docs/architecture.md).
+
 ---
 
 ## Files
@@ -31,6 +37,7 @@ ESP GPIO is injected instead.
 | `findings.md` | Master findings — loads, sensors (with confidence tags), board decode |
 | `wiring.md` | Full wiring guide: sensors to ESP, SSRs to mains, build order |
 | `wiring.svg` / `wiring.png` | Visual wiring diagram |
+| `docs/architecture.md` | Two-tier roadmap: Pi-on-top + real-time streamed control |
 
 Firmware (PlatformIO `platformio.ini` + `src/main.cpp`) is planned but not yet
 committed here.
