@@ -95,8 +95,10 @@ Per-load hot wire (your legend):
 - Pump    hot wire = ______
 - Grinder hot wire = ______
 
-**Factory relays:** bypass them. Route each load's hot wire through your SSR
-instead of the old relay. Leave old relays in place, unpowered.
+**Factory board:** removed entirely — no factory relays left. Route each load's
+hot wire straight through your SSR. Recreate the mains Line/Neutral junctions
+(that used to live on the board) on a barrier strip. Keep any thermal cutoff
+inline in the heater Line.
 
 ### B3. Snubbers (RC, across SSR output terms 1–2)
 - Pump SSR   → 1 snubber across terminals 1–2   (motor = inductive)

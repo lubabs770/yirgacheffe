@@ -10,19 +10,24 @@ Legend: ✅ confirmed · 🟡 strong guess · ❓ unknown / needs bench test
 
 ## Goal
 Full control over every brew variable: brew temp, pump dose/flow, grinder dose.
-ESP32 becomes the brain; factory MCU benched (drive lines cut), ESP drives the
-factory relays. No triac for now → pump speed stays fixed, but flow *measurement*
-(see flow sensor) lets us dose by volume.
+ESP32 becomes the brain. The **factory control board has been removed entirely** —
+the ESP drives new SSRs directly, no factory electronics left in the loop. No
+triac for now → pump speed stays fixed, but flow *measurement* (see flow sensor)
+lets us dose by volume.
 
 ## Architecture ✅
-- Keep factory MCU physically in place, but sever its 3 relay-drive lines and
-  inject ESP GPIO instead.
-- ESP reads sensors, drives 3 loads, exposes WiFi control + OTA.
+- **Factory board removed** (not bypassed — physically gone). ESP replaces it
+  wholesale.
+- SSRs replace the factory relays; an in-machine AC-DC adapter replaces the
+  board's power supply; mains (acl/acn) redistributed on a barrier strip.
+- Any thermal cutoff stays inline in the mains safety path (off-board).
+- ESP reads sensors, drives 4 loads (heater, pump, grinder, steam cover),
+  exposes WiFi control + OTA.
 - Higher-level brain (Pi/phone) optional, sits on top over WiFi. ESP runs safe alone.
 
 ---
 
-## Loads (outputs) — the 3 knobs
+## Loads (outputs) — the 4 knobs
 | Load | Board label | ESP pin | Notes |
 |------|-------------|---------|-------|
 | Heater | relay (big, red wire to metal base) ✅ | GPIO25 | slow-PWM for temp control |
@@ -77,8 +82,9 @@ Switches (sw1/sw2) were factory buttons/interlocks — not needed, ESP replaces 
 
 ## Firmware
 - PlatformIO skeleton planned (`platformio.ini` + `src/main.cpp`) — not yet committed here.
-- Has: 3 loads off-at-boot, NTC analog read, float + dry-pump guard, WiFi web UI,
-  `/status` JSON, OTA, 15s command watchdog. Untested, not flashed.
+- Skeleton had: 3 loads off-at-boot, NTC analog read, float + dry-pump guard,
+  WiFi web UI, `/status` JSON, OTA, 15s command watchdog. Untested, not flashed.
+- **Add 4th load** (steam cover, GPIO32) + cover limit-switch input (GPIO33).
 - **TODO from findings:** flow sensor = **pulse input**, needs interrupt-capable GPIO
   + counter (not analog like NTC/float). Add when flu confirmed.
 - **Calibration pending:** need Ntc1 room-temp Ω value + beta to fix temp math

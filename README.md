@@ -2,8 +2,9 @@
 
 Full ESP32 takeover of a **Cuisinart DGB-30** single-cup grind-and-brew coffee
 maker. Goal: direct control over every brew variable — brew temp, pump dose/flow,
-grinder dose — replacing the factory MCU's control with an ESP32 running
-deterministic firmware plus an optional higher-level brain (Pi/phone) over WiFi.
+grinder dose. The original factory control board has been **removed entirely** —
+an ESP32 running deterministic firmware takes over, plus an optional higher-level
+brain (Pi/phone) over WiFi.
 
 Authorized personal appliance mod on my own hardware.
 
@@ -13,14 +14,17 @@ Authorized personal appliance mod on my own hardware.
 
 Two tiers:
 
-- **ESP32** — real-time deterministic controller. Drives the 3 loads (heater,
-  pump, grinder) through solid-state relays, reads the sensors, runs the safety
-  loops (dry-pump guard, command watchdog). Must run safe standalone.
+- **ESP32** — real-time deterministic controller. Drives the loads (heater,
+  pump, grinder, motorized steam cover) through solid-state relays, reads the
+  sensors, runs the safety loops (dry-pump guard, command watchdog). Must run
+  safe standalone.
 - **Pi / phone (optional)** — high-level brain over WiFi/HTTP/MQTT. Sits on top.
   The ESP never depends on it.
 
-Factory MCU stays physically in place; its 3 relay-drive lines are severed and
-ESP GPIO is injected instead.
+The factory control board is **gone** — not bypassed, physically removed. The
+ESP32 replaces it wholesale: SSRs replace the factory relays, an in-machine
+AC-DC adapter replaces the board's power supply, and mains is redistributed on a
+barrier strip. Any thermal cutoff stays inline in the mains safety path.
 
 **Roadmap:** a Raspberry Pi is the *eventual* second tier on top of the ESP32 —
 for logging, brew profiles, and **real-time streamed control** (live telemetry
@@ -44,13 +48,14 @@ committed here.
 
 ---
 
-## Loads (the 3 knobs)
+## Loads (the 4 knobs)
 
 | Load | ESP pin | Control |
 |------|---------|---------|
 | Heater | GPIO25 | SSR-40DA, slow-PWM for temp |
 | Pump motor | GPIO26 | SSR-40DA + RC snubber |
 | Grinder motor | GPIO27 | SSR-40DA + RC snubber |
+| Steam cover motor | GPIO32 (+GPIO33 limit in) | SSR if AC / H-bridge if DC — TBD at bench |
 
 Mains: **acl / acn** = Line / Neutral. Each SSR sits in series with the Line leg
 of its load; Neutral runs straight through.
