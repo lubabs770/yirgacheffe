@@ -1,12 +1,9 @@
 # zenith
 
 Full ESP32 takeover of a **Cuisinart DGB-30** single-cup grind-and-brew coffee
-maker. Goal: direct control over every brew variable — brew temp, pump dose/flow,
-grinder dose. The original factory control board has been **removed entirely** —
-an ESP32 running deterministic firmware takes over, plus an optional higher-level
-brain (Pi/phone) over WiFi.
-
-Authorized personal appliance mod on my own hardware.
+maker. Goal: direct control over every brew variable avalaible — brew temp, pump dose/flow,
+grinder dose. The original factory control board has been removed entirely —
+an ESP32takes over
 
 ---
 
@@ -14,19 +11,19 @@ Authorized personal appliance mod on my own hardware.
 
 Two tiers:
 
-- **ESP32** — real-time deterministic controller. Drives the loads (heater,
+- **ESP32** — real-time controller. Drives the loads (heater,
   pump, grinder, motorized steam cover) through solid-state relays, reads the
   sensors, runs the safety loops (dry-pump guard, command watchdog). Must run
   safe standalone.
-- **Pi / phone (optional)** — high-level brain over WiFi/HTTP/MQTT. Sits on top.
-  The ESP never depends on it.
+- **Pi / phone** — high-level brain over WiFi/HTTP/MQTT. Sits on top.
+  The ESP never depends on it. // TODO
 
-The factory control board is **gone** — not bypassed, physically removed. The
-ESP32 replaces it wholesale: SSRs replace the factory relays, an in-machine
+The factory control board is gone The ESP32 replaces it wholesale: SSRs replace the 
+factory relays, an in-machine
 AC-DC adapter replaces the board's power supply, and mains is redistributed on a
-barrier strip. Any thermal cutoff stays inline in the mains safety path.
+barrier strip. // Any thermal cutoff stays inline in the mains safety path.
 
-**Roadmap:** a Raspberry Pi is the *eventual* second tier on top of the ESP32 —
+**Roadmap:** a Raspberry Pi is the  second tier on top of the ESP32 —
 for logging, brew profiles, and **real-time streamed control** (live telemetry
 out, time-varying setpoint/profile stream in). The ESP32 always holds the
 real-time loop and fails safe if the stream drops. Full design in
