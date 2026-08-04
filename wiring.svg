@@ -77,8 +77,18 @@
 
   <rect x="60" y="470" width="200" height="86" rx="6" fill="#fff" stroke="#c33"/>
   <text x="160" y="490" text-anchor="middle" font-weight="bold" font-size="12">Ntc1 heat temp</text>
-  <rect x="90" y="500" width="46" height="18" fill="#eee" stroke="#333"/><text x="113" y="514" text-anchor="middle" font-size="10">10k</text>
-  <text x="160" y="540" text-anchor="middle" font-size="10">3V3–10k–GPIO34–NTC–GND</text>
+  <!-- T-divider inset: 3V3 -[10k]-•- NTC -GND, GPIO34 branches off • -->
+  <text x="72" y="527" font-size="9" fill="#e8892a">3V3</text>
+  <line x1="90" y1="524" x2="100" y2="524" stroke="#e8892a" stroke-width="2"/>
+  <rect x="100" y="517" width="30" height="14" fill="#eee" stroke="#333"/><text x="115" y="527" text-anchor="middle" font-size="8">10k</text>
+  <line x1="130" y1="524" x2="150" y2="524" stroke="#e8892a" stroke-width="2"/>
+  <circle cx="151" cy="524" r="3.5" fill="#f5a623" stroke="#b45309"/>
+  <line x1="151" y1="524" x2="163" y2="524" stroke="#333" stroke-width="2"/>
+  <rect x="163" y="517" width="30" height="14" fill="#fff" stroke="#7a3"/><text x="178" y="527" text-anchor="middle" font-size="8">NTC</text>
+  <line x1="193" y1="524" x2="212" y2="524" stroke="#2a9d3a" stroke-width="2"/>
+  <text x="216" y="527" font-size="9" fill="#2a9d3a">GND</text>
+  <line x1="151" y1="524" x2="151" y2="545" stroke="#1a6fd4" stroke-width="2"/>
+  <text x="158" y="551" font-size="9" fill="#1a6fd4">GPIO34 (read, off junction)</text>
   <line x1="260" y1="508" x2="580" y2="515" stroke="#e8892a" stroke-width="2.5"/>
   <line x1="260" y1="523" x2="580" y2="555" stroke="#1a6fd4" stroke-width="2.5"/>
   <path d="M160 556 V960" stroke="#2a9d3a" stroke-width="2.5" fill="none"/>
@@ -101,6 +111,14 @@
   <text x="160" y="732" text-anchor="middle" font-size="10">blue/blue: GPIO33 + GND</text>
   <line x1="260" y1="712" x2="580" y2="675" stroke="#1a6fd4" stroke-width="2.5"/>
   <path d="M215 750 V960" stroke="#2a9d3a" stroke-width="2.5" fill="none"/>
+
+  <rect x="60" y="760" width="200" height="64" rx="6" fill="#fff" stroke="#3a3" stroke-dasharray="4 3"/>
+  <text x="160" y="778" text-anchor="middle" font-weight="bold" font-size="12">green-tab (TBD)</text>
+  <text x="160" y="794" text-anchor="middle" font-size="9">if thermistor: same 10k divider</text>
+  <rect x="100" y="802" width="30" height="14" fill="#eee" stroke="#333"/><text x="115" y="812" text-anchor="middle" font-size="8">10k</text>
+  <circle cx="151" cy="809" r="3.5" fill="#f5a623" stroke="#b45309"/>
+  <line x1="130" y1="809" x2="150" y2="809" stroke="#e8892a" stroke-width="2"/>
+  <text x="160" y="812" text-anchor="start" font-size="9" fill="#1a6fd4">GPIO39</text>
 
   <!-- ===== COMMON GND RAIL ===== -->
   <line x1="120" y1="960" x2="1120" y2="960" stroke="#2a9d3a" stroke-width="4"/>
