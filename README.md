@@ -37,7 +37,9 @@ real-time loop and fails safe if the stream drops. Full design in
 |------|---------|
 | `findings.md` | Master findings — loads, sensors (with confidence tags), board decode |
 | `wiring.md` | Full wiring guide: sensors to ESP, SSRs to mains, build order |
-| `wiring.svg` / `wiring.png` | Visual wiring diagram |
+| `wiring.svg` / `wiring.png` | Full visual wiring diagram (everything at once) |
+| `docs/ntc-divider.*` | Detail: NTC 10k voltage-divider close-up |
+| `docs/cover-relay.*` | Detail: steam-cover 5V opto-relay wiring (AC vs DC) |
 | `docs/architecture.md` | Two-tier roadmap: Pi-on-top + real-time streamed control |
 
 Firmware (PlatformIO `platformio.ini` + `src/main.cpp`) is planned but not yet
@@ -79,4 +81,20 @@ calibration pending — see the open-items lists in `findings.md` and `wiring.md
 
 ## Diagram
 
+Full wiring — everything in one board:
+
 ![wiring diagram](wiring.png)
+
+### Detail diagrams
+
+The resistor/divider was cramped in the full board, so these zoom in on the two
+fiddly bits:
+
+**NTC 10k voltage divider** (temp sensors) — it's a T-junction, not inline:
+
+![ntc divider detail](docs/ntc-divider.png)
+
+**Steam-cover 5V opto relay** — coil side to the ESP now; switch side picks AC
+(mains) or DC (wall wart) after the bench bump test:
+
+![cover relay detail](docs/cover-relay.png)

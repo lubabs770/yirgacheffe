@@ -31,12 +31,50 @@ lets us dose by volume.
 | Load | Board label | ESP pin | Notes |
 |------|-------------|---------|-------|
 | Heater | relay (big, red wire to metal base) ✅ | GPIO25 | slow-PWM for temp control |
-| Pump motor | acmot1 or acmot2 ❓ | GPIO26 | which acmot is pump vs grinder TBD (settle in firmware) |
-| Grinder motor | acmot1 or acmot2 ❓ | GPIO27 | " |
-| Steam cover | **motorized** ✅ | GPIO32 (+GPIO33 in) | **NEW 4th axis.** Motor thingy that slides the cover open/closed over the steam. red/black = motor drive; blue/blue = position/limit switch (🟡, confirm). Motor AC-synchronous vs DC-reversible TBD → driver = 4th SSR or H-bridge. Phase-lock to grind/brew. |
+| Pump motor | acmot ❓ | GPIO26 | **mains AC ✅ — 42.6 Ω, confirmed 2026-08-02** (see Resistance readings). SSR-40DA, original plan stands. Which acmot vs grinder TBD |
+| Grinder motor | acmot ❓ | GPIO27 | mains AC 🟡 (the one "main AC motor" pair observed) |
+| Steam cover | **motorized, AC vs DC TBD** 🟡 | GPIO32 (+ GPIO33 limit in) | **4th axis.** Slides cover open/closed over steam. red/black = motor drive; blue/blue = limit switch. **23.6 Ω (2026-08-02)** — same low-ohm regime as the AC pump, so **AC synchronous now leads** (earlier DC guess walked back). **Driver = 5V opto relay (8-pack received 2026-08-04), active-LOW, on GPIO32** — mechanical relay switches AC or DC, so it works either way and moots the spin test for *choosing a part*. Switch side: AC → mains; DC → wall wart. Bump test still tells which. See `docs/cover-relay.*`. |
 
 Mains: **acl / acn** = Line / Neutral ("wire to wall").
 Board has 3 relays total (2 heater-related, per red/blue-wire-to-metal-base notes).
+
+### Physical build state (2026-07-29)
+- **3× SSR installed, no snubbers fitted yet.** SSRs = heater, pump, grinder.
+  Motor SSRs (pump/grinder) still want RC snubbers across terms 1–2 — fit the
+  spare parts once identified (see below).
+- **Loose parts on bench, unidentified:** a bunch of 3-legged parts "not put in."
+  If transistors (2N2222/BC547/MOSFET) = optional 5V SSR-input drivers (only if
+  3.3V won't trigger). If box-cap + resistor / blue disc = the RC snubbers → fit
+  to pump + grinder SSRs now.
+- **Steam cover — AC vs DC still open (23.6 Ω).** Earlier "almost certainly DC"
+  guess is WALKED BACK: 23.6 Ω is the same low-ohm regime as the confirmed-AC
+  pump (42.6 Ω), and the factory board switched everything with relays + snubbers
+  (AC topology, no MOSFET drivers). AC synchronous now leads. Settle with the
+  spin-shaft test: Ω jumps as you rotate by hand = brushed DC; dead steady = AC coil.
+- **Layout:** AC wiring lives on the bottom; a hot-glued wall adapter down there
+  sends **USB-C up to the top (near grinder)** alongside all DC/low-voltage — clean
+  AC-bottom / DC-top split.
+- **SSR mounting:** 2 SSRs in the OG MCU enclosure; 3rd hot-glued in the opposing
+  leg of the adapter. Heater SSR (+1 other) screwed to the OG metal plate cover =
+  heatsink, with vents aligned to the OG plastic casing.
+
+### Resistance readings + factory-board photos (2026-08-02)
+Machine unplugged. Meter across each motor's own wire pair:
+- **Water pump = 42.6 Ω → mains AC (shaded-pole).** In the 20–80 Ω band; too high
+  for a low-V DC pump (single digits), too low for an Ulka solenoid (100–400 Ω).
+  **Resolves the "pump might be DC" audit — it's AC.** Original SSR-40DA plan holds:
+  no MOSFET, no DC rail, no PWM flow. Fixed speed, dose by volume via `flu`.
+- **Steam cover motor = 23.6 Ω → inconclusive, leans AC.** Same regime as the AC
+  pump; not the single-digit reading a small DC motor gives. Spin-shaft test to confirm.
+
+**Factory board is NOT scrapped — photographed in-hand (`~/Downloads/coffee*.jpeg`).**
+Board decode (settles bench task 8 without touching the pump):
+- **AC switching topology:** black relay cubes + **yellow X-cap RC snubbers** across
+  the contacts = mains inductive loads. No TO-220 MOSFET/flyback drivers anywhere.
+- **PSU:** `EE19-0.8mH` SMPS transformer + `+12V / +5V / GND` rails (silkscreen on
+  back) = **logic + relay-coil supply only**, not a motor drive. So the 12V rail
+  does NOT imply a DC pump.
+- Snubber caps are harvestable off this board if ever wanted (user: not scraping).
 
 ### Top-casing teardown finds (2026-07-26)
 Removed top casing (screws on top).
@@ -95,9 +133,10 @@ Switches (sw1/sw2) were factory buttons/interlocks — not needed, ESP replaces 
 ## Parts on hand ✅
 - 3× SSR-40DA (input 3–32V DC / output 24–380V AC)
 - 1× ESP32-DevKitC-32E
-- Resistors (~10k for NTC divider)
+- 10k resistors — **received 2026-08-04** (NTC dividers; one per thermistor; see `docs/ntc-divider.*`)
+- **5V opto-isolated relay module, 8-pack — received 2026-08-04** (SRD-05VDC-SL-C, 1-ch, NO, 10A@250VAC / 30VDC, active-LOW). Steam-cover driver on GPIO32; 7 spare.
 - DAOKAI RC snubber 5-pack (B0CR3HLH94; tuned 240V, fine for arc suppression)
-- Still needed: 5V USB brick + micro-USB, screw terminals/wire, enclosure
+- Still needed: 5V USB brick + micro-USB, screw terminals/wire, enclosure. Wall wart for cover *only if* it meters out DC.
 
 ---
 
