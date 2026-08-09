@@ -38,8 +38,10 @@ real-time loop and fails safe if the stream drops. Full design in
 | `findings.md` | Master findings — loads, sensors (with confidence tags), board decode |
 | `wiring.md` | Full wiring guide: sensors to ESP, SSRs to mains, build order |
 | `wiring.svg` / `wiring.png` | Full visual wiring diagram (everything at once) |
-| `docs/ntc-divider.*` | Detail: NTC 10k voltage-divider close-up |
-| `docs/cover-relay.*` | Detail: steam-cover 5V opto-relay wiring (AC vs DC) |
+| `docs/ntc-divider.*` | Detail: the 10k resistor — where it goes, and the two wrong ways |
+| `docs/cover-ac.*` | **Steam cover, Option A — motor is AC.** Use if the AA tap gave a hum/nothing |
+| `docs/cover-dc.*` | **Steam cover, Option B — motor is DC.** Use if the AA tap gave a kick |
+| `docs/cover-relay.*` | Steam-cover relay overview (both options side by side) |
 | `docs/architecture.md` | Two-tier roadmap: Pi-on-top + real-time streamed control |
 
 Firmware (PlatformIO `platformio.ini` + `src/main.cpp`) is planned but not yet
