@@ -1,60 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="660" font-family="monospace" font-size="15">
-  <rect width="900" height="660" fill="#fafafa"/>
-  <text x="450" y="40" font-size="24" font-weight="bold" text-anchor="middle">NTC temp sensor — 10k voltage divider (detail)</text>
-  <text x="450" y="66" font-size="14" text-anchor="middle" fill="#555">One 10k resistor per thermistor. It is a T-junction, NOT inline.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="800" font-family="monospace" font-size="15">
+  <rect width="1120" height="800" fill="#fafafa"/>
+  <text x="560" y="40" font-size="24" font-weight="bold" text-anchor="middle">NTC temp sensor — the 10k resistor, in detail</text>
+  <text x="560" y="66" font-size="14" text-anchor="middle" fill="#555">The resistor is NOT in the signal wire. It sits above the sensor, and the GPIO taps the point between them.</text>
 
-  <!-- ===== vertical divider on the left ===== -->
-  <!-- 3V3 rail top -->
-  <text x="300" y="130" text-anchor="end" font-size="16" fill="#e8892a" font-weight="bold">3V3</text>
-  <circle cx="320" cy="125" r="5" fill="#e8892a"/>
-  <line x1="320" y1="125" x2="320" y2="170" stroke="#e8892a" stroke-width="3"/>
+  <!-- ============ LEFT: the correct circuit ============ -->
+  <rect x="40" y="95" width="420" height="470" rx="10" fill="#fff" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="250" y="126" text-anchor="middle" font-size="16" font-weight="bold" fill="#2e9e4f">RIGHT</text>
 
-  <!-- 10k resistor (top leg) -->
-  <rect x="290" y="170" width="60" height="90" rx="4" fill="#fff" stroke="#333" stroke-width="2"/>
-  <text x="320" y="212" text-anchor="middle" font-size="18" font-weight="bold">10k</text>
-  <text x="320" y="234" text-anchor="middle" font-size="12" fill="#666">fixed</text>
+  <text x="205" y="172" font-size="15" font-weight="bold" fill="#e8890c">3V3</text>
+  <circle cx="250" cy="185" r="5" fill="#e8890c"/>
+  <path d="M250 185 V220" stroke="#e8890c" stroke-width="2.5" fill="none"/>
 
-  <!-- wire from 10k down to junction -->
-  <line x1="320" y1="260" x2="320" y2="320" stroke="#e8892a" stroke-width="3"/>
+  <rect x="212" y="220" width="76" height="80" rx="4" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="250" y="255" text-anchor="middle" font-size="17" font-weight="bold">10k</text>
+  <text x="250" y="277" text-anchor="middle" font-size="11" fill="#666">fixed</text>
+  <text x="305" y="252" font-size="12" fill="#666">you supply this one</text>
+  <text x="305" y="270" font-size="12" fill="#666">(the resistors that</text>
+  <text x="305" y="286" font-size="12" fill="#666">arrived 08-04)</text>
 
-  <!-- JUNCTION dot -->
-  <circle cx="320" cy="320" r="8" fill="#f5a623" stroke="#b45309" stroke-width="2"/>
-  <text x="320" y="300" text-anchor="middle" font-size="13" fill="#b45309" font-weight="bold">junction</text>
+  <path d="M250 300 V345" stroke="#e8890c" stroke-width="2.5" fill="none"/>
+  <circle cx="250" cy="345" r="8" fill="#e8890c"/>
+  <text x="152" y="340" font-size="13" font-weight="bold" fill="#e8890c">junction</text>
+  <path d="M250 345 H360" stroke="#1a6fd4" stroke-width="2.5" fill="none"/>
+  <polygon points="360,345 350,340 350,350" fill="#1a6fd4"/>
+  <rect x="300" y="360" width="140" height="46" rx="6" fill="#eef" stroke="#1a6fd4" stroke-width="1.5"/>
+  <text x="370" y="380" text-anchor="middle" font-size="14" fill="#1a6fd4" font-weight="bold">GPIO34</text>
+  <text x="370" y="397" text-anchor="middle" font-size="10" fill="#1a6fd4">reads the junction</text>
 
-  <!-- branch to GPIO34 (signal) -->
-  <line x1="320" y1="320" x2="560" y2="320" stroke="#1a6fd4" stroke-width="3"/>
-  <polygon points="560,320 548,314 548,326" fill="#1a6fd4"/>
-  <rect x="565" y="300" width="180" height="42" rx="6" fill="#eef" stroke="#1a6fd4" stroke-width="2"/>
-  <text x="655" y="320" text-anchor="middle" font-size="15" fill="#1a6fd4" font-weight="bold">GPIO34</text>
-  <text x="655" y="336" text-anchor="middle" font-size="11" fill="#1a6fd4">ADC1 read (input-only)</text>
+  <path d="M250 345 V400" stroke="#2e9e4f" stroke-width="2.5" fill="none"/>
+  <rect x="212" y="400" width="76" height="80" rx="4" fill="#fff" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="250" y="437" text-anchor="middle" font-size="15" font-weight="bold">NTC</text>
+  <text x="250" y="458" text-anchor="middle" font-size="10" fill="#666">sensor</text>
+  <text x="305" y="432" font-size="12" fill="#666">the machine's own</text>
+  <text x="305" y="450" font-size="12" fill="#666">thermistor — already</text>
+  <text x="305" y="468" font-size="12" fill="#666">in the coffee maker</text>
+  <line x1="222" y1="472" x2="278" y2="410" stroke="#2e9e4f" stroke-width="1.5"/>
 
-  <!-- NTC thermistor (bottom leg) -->
-  <line x1="320" y1="320" x2="320" y2="380" stroke="#2a9d3a" stroke-width="3"/>
-  <rect x="288" y="380" width="64" height="90" rx="4" fill="#fff" stroke="#7a3" stroke-width="2"/>
-  <!-- thermistor slash symbol -->
-  <line x1="298" y1="462" x2="342" y2="388" stroke="#7a3" stroke-width="2"/>
-  <polygon points="342,388 330,388 342,400" fill="#7a3"/>
-  <text x="320" y="430" text-anchor="middle" font-size="15" font-weight="bold">NTC</text>
+  <path d="M250 480 V520" stroke="#2e9e4f" stroke-width="2.5" fill="none"/>
+  <line x1="222" y1="520" x2="278" y2="520" stroke="#2e9e4f" stroke-width="3"/>
+  <line x1="232" y1="529" x2="268" y2="529" stroke="#2e9e4f" stroke-width="3"/>
+  <line x1="242" y1="538" x2="258" y2="538" stroke="#2e9e4f" stroke-width="3"/>
+  <text x="292" y="527" font-size="14" fill="#2e9e4f" font-weight="bold">GND</text>
 
-  <!-- wire NTC to GND -->
-  <line x1="320" y1="470" x2="320" y2="510" stroke="#2a9d3a" stroke-width="3"/>
-  <line x1="290" y1="510" x2="350" y2="510" stroke="#2a9d3a" stroke-width="4"/>
-  <line x1="300" y1="518" x2="340" y2="518" stroke="#2a9d3a" stroke-width="3"/>
-  <line x1="310" y1="526" x2="330" y2="526" stroke="#2a9d3a" stroke-width="2"/>
-  <text x="365" y="514" font-size="16" fill="#2a9d3a" font-weight="bold">GND</text>
+  <!-- ============ RIGHT TOP: what the junction physically is ============ -->
+  <rect x="490" y="95" width="590" height="230" rx="10" fill="#fff" stroke="#ccc"/>
+  <text x="510" y="126" font-size="16" font-weight="bold">What "junction" means physically</text>
+  <text x="510" y="152" font-size="13" fill="#555">Three wire ends twisted / soldered into ONE blob,</text>
+  <text x="510" y="172" font-size="13" fill="#555">or landed in ONE screw terminal:</text>
 
-  <!-- ===== right-side explainer ===== -->
-  <rect x="560" y="390" width="300" height="180" rx="8" fill="#fff" stroke="#999"/>
-  <text x="575" y="416" font-weight="bold" font-size="15">How to read it</text>
-  <text x="575" y="442" font-size="13">Vout = 3V3 x NTC / (NTC + 10k)</text>
-  <text x="575" y="464" font-size="13">Hotter block -&gt; NTC drops -&gt; Vout drops.</text>
-  <text x="575" y="490" font-size="12" fill="#a00">Use ADC1 only (GPIO32-39).</text>
-  <text x="575" y="508" font-size="12" fill="#a00">ADC2 dies when WiFi is on.</text>
-  <text x="575" y="534" font-size="12" fill="#555">Ntc1 heatblock -&gt; GPIO34.</text>
-  <text x="575" y="552" font-size="12" fill="#555">Green-tab (if thermistor) -&gt; GPIO39,</text>
-  <text x="575" y="568" font-size="12" fill="#555">its own identical 10k.</text>
+  <circle cx="700" cy="245" r="11" fill="#e8890c"/>
+  <path d="M700 245 L580 210" stroke="#333" stroke-width="3" fill="none"/>
+  <text x="512" y="207" font-size="12">one leg of the 10k</text>
+  <path d="M700 245 L580 292" stroke="#2e9e4f" stroke-width="3" fill="none"/>
+  <text x="512" y="298" font-size="12">one wire of the sensor</text>
+  <path d="M700 245 L830 245" stroke="#1a6fd4" stroke-width="3" fill="none"/>
+  <text x="840" y="249" font-size="12">wire to GPIO34</text>
 
-  <!-- calibration note -->
-  <text x="60" y="612" font-size="12" fill="#333">Calibration: meter Ntc1 at room temp, record the ohms -&gt; sets NTC_NOMINAL / NTC_BETA in firmware.</text>
-  <text x="60" y="632" font-size="12" fill="#333">Confirm each fixed resistor really is ~10k (9.9-10.1k) before soldering.</text>
+  <text x="510" y="316" font-size="12" fill="#d33">The other 10k leg goes to 3V3. The other sensor wire goes to GND.</text>
+
+  <!-- ============ RIGHT BOTTOM: the two wrong ways ============ -->
+  <rect x="490" y="345" width="285" height="220" rx="10" fill="#fff" stroke="#d33" stroke-width="2"/>
+  <text x="632" y="374" text-anchor="middle" font-size="15" font-weight="bold" fill="#d33">WRONG 1</text>
+  <text x="632" y="394" text-anchor="middle" font-size="12" fill="#555">resistor inline in the GPIO wire</text>
+  <text x="510" y="432" font-size="13">3V3 ── NTC ── GND</text>
+  <text x="537" y="456" font-size="13">└─[10k]─ GPIO34</text>
+  <line x1="505" y1="470" x2="760" y2="415" stroke="#d33" stroke-width="3"/>
+  <line x1="505" y1="415" x2="760" y2="470" stroke="#d33" stroke-width="3"/>
+  <text x="510" y="500" font-size="12" fill="#555">No divider = no voltage to read.</text>
+  <text x="510" y="520" font-size="12" fill="#555">Pin just floats.</text>
+
+  <rect x="795" y="345" width="285" height="220" rx="10" fill="#fff" stroke="#d33" stroke-width="2"/>
+  <text x="937" y="374" text-anchor="middle" font-size="15" font-weight="bold" fill="#d33">WRONG 2</text>
+  <text x="937" y="394" text-anchor="middle" font-size="12" fill="#555">resistor below the sensor</text>
+  <text x="815" y="432" font-size="13">3V3 ── NTC ──┬── [10k] ── GND</text>
+  <text x="895" y="456" font-size="13">└── GPIO34</text>
+  <line x1="810" y1="470" x2="1065" y2="415" stroke="#d33" stroke-width="3"/>
+  <line x1="810" y1="415" x2="1065" y2="470" stroke="#d33" stroke-width="3"/>
+  <text x="815" y="500" font-size="12" fill="#555">Works, but backwards: hotter block</text>
+  <text x="815" y="520" font-size="12" fill="#555">now RAISES the reading. Don't.</text>
+
+  <!-- ============ BOTTOM notes ============ -->
+  <rect x="40" y="590" width="1040" height="185" rx="10" fill="#fff" stroke="#ccc"/>
+  <text x="60" y="618" font-size="15" font-weight="bold">How to read it</text>
+  <text x="60" y="644" font-size="13">Vout = 3V3 x NTC / (NTC + 10k)</text>
+  <text x="60" y="668" font-size="13">Hotter block -&gt; NTC resistance drops -&gt; Vout drops.</text>
+  <text x="60" y="694" font-size="13" fill="#d33">Use ADC1 pins only (GPIO32-39). ADC2 stops working the moment WiFi is on.</text>
+  <text x="60" y="720" font-size="13">One 10k per thermistor. Ntc1 heatblock -&gt; GPIO34.</text>
+  <text x="60" y="742" font-size="13">Green-tab, if it turns out to be a thermistor -&gt; GPIO39, with its own identical 10k.</text>
+  <text x="60" y="766" font-size="13" fill="#555">Before soldering, meter the fixed resistor itself: it should read 9.9-10.1k.</text>
 </svg>
