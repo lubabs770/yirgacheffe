@@ -1,9 +1,9 @@
 # zenith
 
 Full ESP32 takeover of a **Cuisinart DGB-30** single-cup grind-and-brew coffee
-maker. Goal: direct control over every brew variable avalaible — brew temp, pump dose/flow,
+maker. Goal: direct control over every brew variable available — brew temp, pump dose/flow,
 grinder dose. The original factory control board has been removed entirely —
-an ESP32takes over
+an ESP32 takes over.
 
 ---
 
@@ -18,12 +18,12 @@ Two tiers:
 - **Pi / phone** — high-level brain over WiFi/HTTP/MQTT. Sits on top.
   The ESP never depends on it. // TODO
 
-The factory control board is gone The ESP32 replaces it wholesale: SSRs replace the 
+The factory control board is gone. The ESP32 replaces it wholesale: SSRs replace the 
 factory relays, an in-machine
 AC-DC adapter replaces the board's power supply, and mains is redistributed on a
 barrier strip. // Any thermal cutoff stays inline in the mains safety path.
 
-**Roadmap:** a Raspberry Pi is the  second tier on top of the ESP32 —
+**Roadmap:** a Raspberry Pi is the second tier on top of the ESP32 —
 for logging, brew profiles, and **real-time streamed control** (live telemetry
 out, time-varying setpoint/profile stream in). The ESP32 always holds the
 real-time loop and fails safe if the stream drops. Full design in
