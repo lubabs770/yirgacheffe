@@ -2,7 +2,7 @@
 
 Cuisinart DGB-30 single-cup grind-and-brew → ESP32 takeover.
 Everything we've *pinned* down (pun intended). Confidence tagged per item.
-Last updated: 2026-07-15
+Last updated: 2026-08-04
 
 Legend: ✅ confirmed · 🟡 strong guess · ❓ unknown / needs bench test
 
