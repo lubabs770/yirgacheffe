@@ -76,7 +76,8 @@ dosing by volume even without a triac (fixed pump speed, measured flow).
 ## Status
 
 Bench findings documented; parts on hand (3× SSR-40DA, ESP32-DevKitC-32E,
-resistors, RC snubbers). Wiring guide written. Live testing and firmware
+5V opto-relay module for the steam cover, 10k resistors, RC snubbers). Wiring
+guide written. Live testing and firmware
 calibration pending — see the open-items lists in `findings.md` and `wiring.md`.
 
 ## Diagram
