@@ -54,7 +54,7 @@ committed here.
 | Heater | GPIO25 | SSR-40DA, slow-PWM for temp |
 | Pump motor | GPIO26 | SSR-40DA + RC snubber |
 | Grinder motor | GPIO27 | SSR-40DA + RC snubber |
-| Steam cover motor | GPIO32 (+GPIO33 limit in) | SSR if AC / H-bridge if DC — TBD at bench |
+| Steam cover motor | GPIO32 (+GPIO33 limit in) | 5V opto-relay, active-LOW — switches AC or DC |
 
 Mains: **acl / acn** = Line / Neutral. Each SSR sits in series with the Line leg
 of its load; Neutral runs straight through.
