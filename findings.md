@@ -146,7 +146,7 @@ Switches (sw1/sw2) were factory buttons/interlocks — not needed, ESP replaces 
 3. **Float (red 3-wire):** confirm open/closed logic when tank empty vs float raised; ID the 3 wires.
 4. **Ntc1:** record room-temp Ω value → firmware calibration.
 5. **acmot1 vs acmot2:** which is pump, which grinder (can defer to firmware — fire each, watch which spins).
-6. **Steam cover motor:** confirm red/black=winding vs blue/blue=switch (Ω per pair; switch flips when cover moved by hand). Classify motor AC vs DC (winding Ω + markings) → picks 4th-SSR vs H-bridge driver.
+6. **Steam cover motor:** confirm red/black=winding vs blue/blue=switch (Ω per pair; switch flips when cover moved by hand). Classify motor AC vs DC (winding Ω + markings) → sets whether the cover-relay switch side goes to **mains (AC)** or a **wall wart (DC)**; driver part already chosen (5V opto relay, switches either).
 7. **4-white safety cutoff:** confirm it's thermal (high-limit) → keep in series in heater mains Line, upstream of heater SSR.
 
 ## Working mode
