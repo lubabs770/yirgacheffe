@@ -16,9 +16,11 @@ Fill in the `______` blanks from your own legend (your wire colors ↔ each poin
 | Heater SSR control | GPIO25 | output |
 | Pump SSR control | GPIO26 | output |
 | Grinder SSR control | GPIO27 | output |
+| Steam-cover control | GPIO32 | output (5V opto relay, active-LOW) |
+| Cover limit switch | GPIO33 | INPUT_PULLUP |
 | Ntc1 heatblock temp | GPIO34 | analog in (divider) |
 | Float / level | GPIO14 | INPUT_PULLUP |
-| Flow (flu) signal | GPIO35 or GPIO32 | interrupt, pulse count |
+| Flow (flu) signal | GPIO35 | interrupt, pulse count |
 | Green-tab sensor | GPIO39 (if thermistor) | analog in (divider) — OR digital / leave in mains if cutoff |
 
 **Common ground:** every sensor ground, every SSR terminal-4 (−), and ESP `GND`

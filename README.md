@@ -1,9 +1,9 @@
 # zenith
 
 Full ESP32 takeover of a **Cuisinart DGB-30** single-cup grind-and-brew coffee
-maker. Goal: direct control over every brew variable avalaible — brew temp, pump dose/flow,
+maker. Goal: direct control over every brew variable available — brew temp, pump dose/flow,
 grinder dose. The original factory control board has been removed entirely —
-an ESP32takes over
+an ESP32 takes over.
 
 ---
 
@@ -18,12 +18,12 @@ Two tiers:
 - **Pi / phone** — high-level brain over WiFi/HTTP/MQTT. Sits on top.
   The ESP never depends on it. // TODO
 
-The factory control board is gone The ESP32 replaces it wholesale: SSRs replace the 
+The factory control board is gone. The ESP32 replaces it wholesale: SSRs replace the 
 factory relays, an in-machine
 AC-DC adapter replaces the board's power supply, and mains is redistributed on a
 barrier strip. // Any thermal cutoff stays inline in the mains safety path.
 
-**Roadmap:** a Raspberry Pi is the  second tier on top of the ESP32 —
+**Roadmap:** a Raspberry Pi is the second tier on top of the ESP32 —
 for logging, brew profiles, and **real-time streamed control** (live telemetry
 out, time-varying setpoint/profile stream in). The ESP32 always holds the
 real-time loop and fails safe if the stream drops. Full design in
@@ -56,7 +56,7 @@ committed here.
 | Heater | GPIO25 | SSR-40DA, slow-PWM for temp |
 | Pump motor | GPIO26 | SSR-40DA + RC snubber |
 | Grinder motor | GPIO27 | SSR-40DA + RC snubber |
-| Steam cover motor | GPIO32 (+GPIO33 limit in) | SSR if AC / H-bridge if DC — TBD at bench |
+| Steam cover motor | GPIO32 (+GPIO33 limit in) | 5V opto-relay, active-LOW — switches AC or DC |
 
 Mains: **acl / acn** = Line / Neutral. Each SSR sits in series with the Line leg
 of its load; Neutral runs straight through.
@@ -78,7 +78,8 @@ dosing by volume even without a triac (fixed pump speed, measured flow).
 ## Status
 
 Bench findings documented; parts on hand (3× SSR-40DA, ESP32-DevKitC-32E,
-resistors, RC snubbers). Wiring guide written. Live testing and firmware
+5V opto-relay module for the steam cover, 10k resistors, RC snubbers). Wiring
+guide written. Live testing and firmware
 calibration pending — see the open-items lists in `findings.md` and `wiring.md`.
 
 ## Diagram
