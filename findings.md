@@ -39,16 +39,14 @@ Mains: **acl / acn** = Line / Neutral ("wire to wall").
 Board has 3 relays total (2 heater-related, per red/blue-wire-to-metal-base notes).
 
 ### Physical build state (2026-07-29)
-- **3× SSR installed, no snubbers fitted yet.** SSRs = heater, pump, grinder.
-  Motor SSRs (pump/grinder) still want RC snubbers across terms 1–2 — fit the
-  spare parts once identified (see below).
+- **3× SSR installed.** SSRs = heater, pump, grinder. Bare contacts — see the
+  no-snubbers rule at the top of `wiring.md`.
 - **Loose parts on bench, unidentified:** a bunch of 3-legged parts "not put in."
   If transistors (2N2222/BC547/MOSFET) = optional 5V SSR-input drivers (only if
-  3.3V won't trigger). If box-cap + resistor / blue disc = the RC snubbers → fit
-  to pump + grinder SSRs now.
+  3.3V won't trigger).
 - **Steam cover — AC vs DC still open (23.6 Ω).** Earlier "almost certainly DC"
   guess is WALKED BACK: 23.6 Ω is the same low-ohm regime as the confirmed-AC
-  pump (42.6 Ω), and the factory board switched everything with relays + snubbers
+  pump (42.6 Ω), and the factory board switched everything with mechanical relays
   (AC topology, no MOSFET drivers). AC synchronous now leads. Settle with the
   spin-shaft test: Ω jumps as you rotate by hand = brushed DC; dead steady = AC coil.
 - **Layout:** AC wiring lives on the bottom; a hot-glued wall adapter down there
@@ -69,12 +67,11 @@ Machine unplugged. Meter across each motor's own wire pair:
 
 **Factory board is NOT scrapped — photographed in-hand (`~/Downloads/coffee*.jpeg`).**
 Board decode (settles bench task 8 without touching the pump):
-- **AC switching topology:** black relay cubes + **yellow X-cap RC snubbers** across
-  the contacts = mains inductive loads. No TO-220 MOSFET/flyback drivers anywhere.
+- **AC switching topology:** black relay cubes + **yellow X-caps** across the
+  contacts = mains inductive loads. No TO-220 MOSFET/flyback drivers anywhere.
 - **PSU:** `EE19-0.8mH` SMPS transformer + `+12V / +5V / GND` rails (silkscreen on
   back) = **logic + relay-coil supply only**, not a motor drive. So the 12V rail
   does NOT imply a DC pump.
-- Snubber caps are harvestable off this board if ever wanted (user: not scraping).
 
 ### Top-casing teardown finds (2026-07-26)
 Removed top casing (screws on top).
@@ -135,7 +132,6 @@ Switches (sw1/sw2) were factory buttons/interlocks — not needed, ESP replaces 
 - 1× ESP32-DevKitC-32E
 - 10k resistors — **received 2026-08-04** (NTC dividers; one per thermistor; see `docs/ntc-divider.*`)
 - **5V opto-isolated relay module, 8-pack — received 2026-08-04** (SRD-05VDC-SL-C, 1-ch, NO, 10A@250VAC / 30VDC, active-LOW). Steam-cover driver on GPIO32; 7 spare.
-- DAOKAI RC snubber 5-pack (B0CR3HLH94; tuned 240V, fine for arc suppression)
 - Still needed: 5V USB brick + micro-USB, screw terminals/wire, enclosure. Wall wart for cover *only if* it meters out DC.
 
 ---

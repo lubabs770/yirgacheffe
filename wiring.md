@@ -8,6 +8,10 @@ Cuisinart DGB-30 → ESP32. Read fully before touching anything.
 
 Fill in the `______` blanks from your own legend (your wire colors ↔ each point).
 
+> **No snubbers on this build — don't mention them.** No RC snubbers on hand, none
+> going in. Bare SSR / relay contacts everywhere. Do not re-add snubber steps to
+> this guide, `findings.md`, `README.md`, or the diagrams.
+
 ---
 
 ## Pin map (matches firmware `src/main.cpp`)
@@ -102,12 +106,7 @@ hot wire straight through your SSR. Recreate the mains Line/Neutral junctions
 (that used to live on the board) on a barrier strip. Keep any thermal cutoff
 inline in the heater Line.
 
-### B3. Snubbers (RC, across SSR output terms 1–2)
-- Pump SSR   → 1 snubber across terminals 1–2   (motor = inductive)
-- Grinder SSR → 1 snubber across terminals 1–2   (motor = inductive)
-- Heater SSR → NO snubber (resistive load)
-
-### B4. Heatsink
+### B3. Heatsink
 - Heater SSR (~15W) → bolt to heatsink OR machine metal base (thermal paste).
 - Pump / grinder SSR → run cool, no heatsink.
 
@@ -119,7 +118,7 @@ inline in the heater Line.
 3. Power ESP from **5V USB brick only** (NOT wall mains). Flash firmware,
    open web page, tap each load button → SSR **input LEDs** light.
    Proves entire logic side with ZERO mains connected.
-4. Only after step 3 passes: unplug USB, wire **mains side** (B2/B3/B4).
+4. Only after step 3 passes: unplug USB, wire **mains side** (B2/B3).
    Machine still unplugged from wall.
 5. Live test: plug machine into wall, water tank FULL, fire one load at a time
    from the web page.

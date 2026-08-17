@@ -54,8 +54,8 @@ committed here.
 | Load | ESP pin | Control |
 |------|---------|---------|
 | Heater | GPIO25 | SSR-40DA, slow-PWM for temp |
-| Pump motor | GPIO26 | SSR-40DA + RC snubber |
-| Grinder motor | GPIO27 | SSR-40DA + RC snubber |
+| Pump motor | GPIO26 | SSR-40DA |
+| Grinder motor | GPIO27 | SSR-40DA |
 | Steam cover motor | GPIO32 (+GPIO33 limit in) | 5V opto-relay, active-LOW — switches AC or DC |
 
 Mains: **acl / acn** = Line / Neutral. Each SSR sits in series with the Line leg
@@ -78,9 +78,12 @@ dosing by volume even without a triac (fixed pump speed, measured flow).
 ## Status
 
 Bench findings documented; parts on hand (3× SSR-40DA, ESP32-DevKitC-32E,
-5V opto-relay module for the steam cover, 10k resistors, RC snubbers). Wiring
+5V opto-relay module for the steam cover, 10k resistors). Wiring
 guide written. Live testing and firmware
 calibration pending — see the open-items lists in `findings.md` and `wiring.md`.
+
+**No snubbers on this build — don't mention them.** None on hand, none going in;
+bare SSR / relay contacts throughout.
 
 ## Diagram
 
