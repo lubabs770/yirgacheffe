@@ -1,11 +1,23 @@
 // zenith — Cuisinart DGB-30 ESP32 takeover
-// BENCH FIRMWARE: characterization + manual load control over USB serial.
+// BENCH FIRMWARE: characterization + manual load control, serial + WiFi/OTA.
 //
 // Purpose (build-order step 3): prove the whole logic side with ZERO mains
 // connected, and identify the still-unknown sensors without a multimeter.
-// No WiFi yet — USB serial only, so there is nothing to configure at the bench.
+//
+// OTA is the point of this build. Once the machine is closed up, the USB port
+// is behind fragile, obstructed joints — so every later firmware change has to
+// arrive over the air. Prove OTA works BEFORE anything gets buttoned up.
+//
+// WiFi credentials are never in this repo. Set them once over serial with
+//     W<ssid>/<password>
+// and they persist in NVS across reboots and OTA pushes.
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <ArduinoOTA.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
 
 // ---------------------------------------------------------------- pin map
 // Matches wiring.md. GPIO34/35/39 are input-only (no internal pullup).
@@ -51,6 +63,11 @@ static Load loads[] = {
   {"cover",   PIN_COVER,   true,  false, 0},
 };
 static const size_t N_LOADS = sizeof(loads) / sizeof(loads[0]);
+
+static Preferences prefs;
+static WebServer    server(80);
+static bool         wifiUp = false;
+static bool         otaUp  = false;
 
 static volatile uint32_t flowPulses = 0;
 static uint32_t          lastFlowSnapshot = 0;
@@ -108,6 +125,8 @@ static void printHelp() {
   Serial.println(F("  s       : print one status line"));
   Serial.println(F("  z       : zero the flow pulse counter"));
   Serial.println(F("  U       : arm dry-pump override (bench only, no mains)"));
+  Serial.println(F("  W..     : set wifi, W<ssid>/<password> (saved, reboots)"));
+  Serial.println(F("  i       : wifi/OTA/IP info"));
   Serial.println(F("  ?       : this help"));
   Serial.println(F("Loads auto-off after 15s with no command (watchdog).\n"));
 }
@@ -128,6 +147,115 @@ static void telemetry() {
     digitalRead(PIN_COVER_LIMIT) ? "HIGH" : "LOW ",
     (unsigned long)pulses, (unsigned long)dPulses,
     loads[0].on, loads[1].on, loads[2].on, loads[3].on);
+}
+
+
+// ------------------------------------------------------------------ WiFi/OTA
+static void startWifi() {
+  prefs.begin("zenith", true);
+  String ssid = prefs.getString("ssid", "");
+  String pass = prefs.getString("pass", "");
+  prefs.end();
+
+  if (ssid.isEmpty()) {
+    Serial.println(F("WiFi: no credentials stored. Set with  W<ssid>/<password>"));
+    return;
+  }
+
+  Serial.printf("WiFi: connecting to %s ...\n", ssid.c_str());
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname("zenith");
+  WiFi.begin(ssid.c_str(), pass.c_str());
+
+  uint32_t t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+    delay(250);
+    Serial.print('.');
+  }
+  Serial.println();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println(F("WiFi: FAILED. Serial still works; fix creds and reboot."));
+    return;
+  }
+  wifiUp = true;
+  Serial.print(F("WiFi: connected, IP = "));
+  Serial.println(WiFi.localIP());
+
+  if (MDNS.begin("zenith")) Serial.println(F("mDNS: http://zenith.local/"));
+
+  // Loads must never be energized across a firmware swap.
+  ArduinoOTA.setHostname("zenith");
+  ArduinoOTA.onStart([]() { allOff(); Serial.println(F("OTA: start, all loads off")); });
+  ArduinoOTA.onEnd([]()   { Serial.println(F("OTA: done, rebooting")); });
+  ArduinoOTA.onError([](ota_error_t e) { Serial.printf("OTA: error %u\n", e); });
+  ArduinoOTA.begin();
+  otaUp = true;
+  Serial.println(F("OTA: armed"));
+}
+
+static void saveWifi(const String &arg) {
+  int slash = arg.indexOf('/');
+  if (slash < 1) { Serial.println(F("usage: W<ssid>/<password>")); return; }
+  prefs.begin("zenith", false);
+  prefs.putString("ssid", arg.substring(0, slash));
+  prefs.putString("pass", arg.substring(slash + 1));
+  prefs.end();
+  Serial.println(F("WiFi credentials saved. Rebooting..."));
+  delay(300);
+  ESP.restart();
+}
+
+static String statusJson() {
+  uint32_t ntcMv = 0, greenMv = 0;
+  float ntcOhms   = dividerOhms(PIN_NTC1, ntcMv);
+  float greenOhms = dividerOhms(PIN_GREEN, greenMv);
+  String j = "{";
+  j += "\"ntc1_mv\":" + String(ntcMv) + ",\"ntc1_ohm\":" + String(ntcOhms, 1);
+  j += ",\"green_mv\":" + String(greenMv) + ",\"green_ohm\":" + String(greenOhms, 1);
+  j += ",\"float\":" + String(digitalRead(PIN_FLOAT));
+  j += ",\"cover_limit\":" + String(digitalRead(PIN_COVER_LIMIT));
+  j += ",\"flow\":" + String((unsigned long)flowPulses);
+  j += ",\"loads\":{";
+  for (size_t i = 0; i < N_LOADS; i++) {
+    j += "\"" + String(loads[i].name) + "\":" + String(loads[i].on ? 1 : 0);
+    if (i + 1 < N_LOADS) j += ",";
+  }
+  j += "}}";
+  return j;
+}
+
+static void startWeb() {
+  server.on("/status", []() { server.send(200, "application/json", statusJson()); });
+
+  server.on("/set", []() {
+    String name = server.arg("load");
+    bool on = server.arg("on") == "1";
+    for (size_t i = 0; i < N_LOADS; i++) {
+      if (name == loads[i].name) { setLoad(i, on); break; }
+    }
+    server.send(200, "application/json", statusJson());
+  });
+
+  server.on("/off", []() { allOff(); server.send(200, "application/json", statusJson()); });
+
+  server.on("/", []() {
+    String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
+                 "<title>zenith</title><style>body{font:16px system-ui;margin:2rem;max-width:34rem}"
+                 "button{font:inherit;padding:.6rem 1rem;margin:.2rem}pre{background:#eee;padding:1rem}</style>"
+                 "<h1>zenith bench</h1><div>");
+    for (size_t i = 0; i < N_LOADS; i++) {
+      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=1').then(r)\">"
+           + String(loads[i].name) + " ON</button>";
+      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=0').then(r)\">off</button><br>";
+    }
+    h += F("</div><button onclick=\"fetch('/off').then(r)\">ALL OFF</button><pre id=s></pre>"
+           "<script>function r(){}setInterval(async()=>{"
+           "s.textContent=JSON.stringify(await (await fetch('/status')).json(),null,1)},500)</script>");
+    server.send(200, "text/html", h);
+  });
+
+  server.begin();
 }
 
 void setup() {
@@ -152,6 +280,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_FLOW), onFlowPulse, FALLING);
 
   Serial.println(F("\nzenith bench firmware up. All loads OFF."));
+  startWifi();
+  if (wifiUp) startWeb();
   printHelp();
 }
 
@@ -167,10 +297,16 @@ void loop() {
       case 's': telemetry(); break;
       case 'z': flowPulses = 0; lastFlowSnapshot = 0; Serial.println(F("flow zeroed")); break;
       case 'U': unsafeAllowDryPump = true; Serial.println(F("dry-pump override ARMED")); break;
+      case 'W': saveWifi(Serial.readStringUntil('\n')); break;
+      case 'i': Serial.printf("wifi=%d ota=%d ip=%s\n", wifiUp, otaUp,
+                              wifiUp ? WiFi.localIP().toString().c_str() : "-"); break;
       case '?': printHelp(); break;
       default: break;
     }
   }
+
+  if (otaUp)  ArduinoOTA.handle();
+  if (wifiUp) server.handleClient();
 
   uint32_t now = millis();
 
