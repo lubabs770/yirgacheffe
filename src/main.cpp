@@ -18,6 +18,7 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
+#include <Update.h>
 
 // ---------------------------------------------------------------- pin map
 // Matches wiring.md. GPIO34/35/39 are input-only (no internal pullup).
@@ -325,6 +326,33 @@ static void startWeb() {
     server.begin();
     return;
   }
+
+  // HTTP OTA. ArduinoOTA (below) needs the board to dial back to the pushing
+  // machine, which a firewall on that machine silently drops -- and the whole
+  // point of OTA here is that it keeps working once USB is unreachable. A plain
+  // upload endpoint only ever receives, so it survives firewalls and works from
+  // anything that can POST.
+  //   curl -F firmware=@firmware.bin http://zenith.local/update
+  server.on("/update", HTTP_POST,
+    []() {
+      server.sendHeader("Connection", "close");
+      server.send(200, "text/plain", Update.hasError() ? "FAIL\n" : "OK, rebooting\n");
+      delay(400);
+      ESP.restart();
+    },
+    []() {
+      HTTPUpload &up = server.upload();
+      if (up.status == UPLOAD_FILE_START) {
+        allOff();                       // never swap firmware with a load live
+        Serial.printf("HTTP OTA: receiving %s\n", up.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
+      } else if (up.status == UPLOAD_FILE_WRITE) {
+        if (Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
+      } else if (up.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) Serial.printf("HTTP OTA: %u bytes, rebooting\n", up.totalSize);
+        else Update.printError(Serial);
+      }
+    });
 
   server.on("/status", []() { server.send(200, "application/json", statusJson()); });
 
