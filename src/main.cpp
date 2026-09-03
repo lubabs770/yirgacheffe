@@ -125,7 +125,10 @@ static void printHelp() {
   Serial.println(F("  s       : print one status line"));
   Serial.println(F("  z       : zero the flow pulse counter"));
   Serial.println(F("  U       : arm dry-pump override (bench only, no mains)"));
-  Serial.println(F("  W..     : set wifi, W<ssid>/<password> (saved, reboots)"));
+  Serial.println(F("  S       : scan for wifi networks (numbered list)"));
+  Serial.println(F("  C..     : join scanned network, C<number>/<password>"));
+  Serial.println(F("  W..     : join by name, W<ssid>/<password>"));
+  Serial.println(F("  L       : list stored networks"));
   Serial.println(F("  i       : wifi/OTA/IP info"));
   Serial.println(F("  ?       : this help"));
   Serial.println(F("Loads auto-off after 15s with no command (watchdog).\n"));
@@ -151,40 +154,96 @@ static void telemetry() {
 
 
 // ------------------------------------------------------------------ WiFi/OTA
-static void startWifi() {
-  prefs.begin("zenith", true);
-  String ssid = prefs.getString("ssid", "");
-  String pass = prefs.getString("pass", "");
-  prefs.end();
+// The machine moves between networks, and once it is closed up the USB port is
+// unreachable. So WiFi config must never require a cable:
+//   * up to MAX_NETS networks are remembered and tried in turn at boot;
+//   * if none come up, the ESP raises its own access point and serves a setup
+//     page listing the networks it can see, so a new one can be joined from
+//     any laptop without opening the machine.
 
-  if (ssid.isEmpty()) {
-    Serial.println(F("WiFi: no credentials stored. Set with  W<ssid>/<password>"));
-    return;
+static const int MAX_NETS = 3;
+
+static String scanSsids[16];
+static int    scanCount = 0;
+static bool   apMode    = false;
+
+static const char *AP_SSID = "zenith-setup";
+static const char *AP_PASS = "zenith1234";
+
+static void wifiScan() {
+  Serial.println(F("scanning for networks..."));
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  int n = WiFi.scanNetworks();
+  scanCount = (n > 16) ? 16 : (n < 0 ? 0 : n);
+  for (int i = 0; i < scanCount; i++) {
+    scanSsids[i] = WiFi.SSID(i);
+    Serial.printf("  [%d] %-32s %4d dBm%s\n", i, scanSsids[i].c_str(),
+                  WiFi.RSSI(i), WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "  (open)" : "");
   }
+  if (scanCount == 0) Serial.println(F("  (none found)"));
+}
 
-  Serial.printf("WiFi: connecting to %s ...\n", ssid.c_str());
+static void addNetwork(const String &ssid, const String &pass) {
+  prefs.begin("zenith", false);
+  // Read existing, drop any entry with the same name, push the new one to front.
+  String ss[MAX_NETS], pp[MAX_NETS];
+  int count = prefs.getInt("n", 0);
+  int k = 0;
+  for (int i = 0; i < count && k < MAX_NETS - 1; i++) {
+    String s2 = prefs.getString(("ssid" + String(i)).c_str(), "");
+    if (s2.isEmpty() || s2 == ssid) continue;
+    ss[k] = s2;
+    pp[k] = prefs.getString(("pass" + String(i)).c_str(), "");
+    k++;
+  }
+  prefs.putString("ssid0", ssid);
+  prefs.putString("pass0", pass);
+  for (int i = 0; i < k; i++) {
+    prefs.putString(("ssid" + String(i + 1)).c_str(), ss[i]);
+    prefs.putString(("pass" + String(i + 1)).c_str(), pp[i]);
+  }
+  prefs.putInt("n", k + 1);
+  prefs.end();
+  Serial.printf("saved network \"%s\" (%d stored)\n", ssid.c_str(), k + 1);
+}
+
+static void listNetworks() {
+  prefs.begin("zenith", true);
+  int count = prefs.getInt("n", 0);
+  Serial.printf("stored networks: %d\n", count);
+  for (int i = 0; i < count; i++)
+    Serial.printf("  %d. %s\n", i, prefs.getString(("ssid" + String(i)).c_str(), "").c_str());
+  prefs.end();
+}
+
+static bool tryConnect(const String &ssid, const String &pass, uint32_t timeoutMs) {
+  Serial.printf("WiFi: trying \"%s\" ...", ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("zenith");
   WiFi.begin(ssid.c_str(), pass.c_str());
-
   uint32_t t0 = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) {
     delay(250);
     Serial.print('.');
   }
-  Serial.println();
+  Serial.println(WiFi.status() == WL_CONNECTED ? " ok" : " failed");
+  return WiFi.status() == WL_CONNECTED;
+}
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println(F("WiFi: FAILED. Serial still works; fix creds and reboot."));
-    return;
-  }
-  wifiUp = true;
-  Serial.print(F("WiFi: connected, IP = "));
-  Serial.println(WiFi.localIP());
+static void startAP() {
+  apMode = true;
+  wifiScan();
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(AP_SSID, AP_PASS);
+  Serial.printf("\nAP MODE. Join wifi \"%s\" (password %s)\n", AP_SSID, AP_PASS);
+  Serial.print(F("Then open  http://"));
+  Serial.print(WiFi.softAPIP());
+  Serial.println(F("/  to pick a network.\n"));
+}
 
-  if (MDNS.begin("zenith")) Serial.println(F("mDNS: http://zenith.local/"));
-
-  // Loads must never be energized across a firmware swap.
+static void startOta() {
   ArduinoOTA.setHostname("zenith");
   ArduinoOTA.onStart([]() { allOff(); Serial.println(F("OTA: start, all loads off")); });
   ArduinoOTA.onEnd([]()   { Serial.println(F("OTA: done, rebooting")); });
@@ -194,16 +253,30 @@ static void startWifi() {
   Serial.println(F("OTA: armed"));
 }
 
-static void saveWifi(const String &arg) {
-  int slash = arg.indexOf('/');
-  if (slash < 1) { Serial.println(F("usage: W<ssid>/<password>")); return; }
-  prefs.begin("zenith", false);
-  prefs.putString("ssid", arg.substring(0, slash));
-  prefs.putString("pass", arg.substring(slash + 1));
+static void startWifi() {
+  prefs.begin("zenith", true);
+  int count = prefs.getInt("n", 0);
+  String ss[MAX_NETS], pp[MAX_NETS];
+  for (int i = 0; i < count && i < MAX_NETS; i++) {
+    ss[i] = prefs.getString(("ssid" + String(i)).c_str(), "");
+    pp[i] = prefs.getString(("pass" + String(i)).c_str(), "");
+  }
   prefs.end();
-  Serial.println(F("WiFi credentials saved. Rebooting..."));
-  delay(300);
-  ESP.restart();
+
+  for (int i = 0; i < count && i < MAX_NETS; i++) {
+    if (ss[i].isEmpty()) continue;
+    if (tryConnect(ss[i], pp[i], 12000)) {
+      wifiUp = true;
+      Serial.print(F("WiFi: connected, IP = "));
+      Serial.println(WiFi.localIP());
+      if (MDNS.begin("zenith")) Serial.println(F("mDNS: http://zenith.local/"));
+      startOta();
+      return;
+    }
+  }
+
+  Serial.println(F("WiFi: no stored network reachable."));
+  startAP();
 }
 
 static String statusJson() {
@@ -226,6 +299,27 @@ static String statusJson() {
 }
 
 static void startWeb() {
+  if (apMode) {
+    server.on("/", []() {
+      String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
+                   "<title>zenith setup</title><style>body{font:16px system-ui;margin:2rem;max-width:28rem}"
+                   "select,input,button{font:inherit;padding:.5rem;width:100%;margin:.3rem 0}</style>"
+                   "<h1>zenith wifi setup</h1><form action=/save method=get><select name=ssid>");
+      for (int i = 0; i < scanCount; i++) h += "<option>" + scanSsids[i] + "</option>";
+      h += F("</select><input name=pass type=password placeholder='wifi password'>"
+             "<button>save &amp; reboot</button></form>");
+      server.send(200, "text/html", h);
+    });
+    server.on("/save", []() {
+      addNetwork(server.arg("ssid"), server.arg("pass"));
+      server.send(200, "text/html", F("<h1>saved</h1><p>rebooting, this page is done.</p>"));
+      delay(400);
+      ESP.restart();
+    });
+    server.begin();
+    return;
+  }
+
   server.on("/status", []() { server.send(200, "application/json", statusJson()); });
 
   server.on("/set", []() {
@@ -281,7 +375,7 @@ void setup() {
 
   Serial.println(F("\nzenith bench firmware up. All loads OFF."));
   startWifi();
-  if (wifiUp) startWeb();
+  if (wifiUp || apMode) startWeb();
   printHelp();
 }
 
@@ -297,7 +391,28 @@ void loop() {
       case 's': telemetry(); break;
       case 'z': flowPulses = 0; lastFlowSnapshot = 0; Serial.println(F("flow zeroed")); break;
       case 'U': unsafeAllowDryPump = true; Serial.println(F("dry-pump override ARMED")); break;
-      case 'W': saveWifi(Serial.readStringUntil('\n')); break;
+      case 'S': wifiScan(); break;
+      case 'L': listNetworks(); break;
+      case 'C': {  // C<index>/<password> — join a network from the last scan
+        String a = Serial.readStringUntil('\n'); a.trim();
+        int sl = a.indexOf('/');
+        int idx = (sl < 0) ? a.toInt() : a.substring(0, sl).toInt();
+        String pw = (sl < 0) ? "" : a.substring(sl + 1);
+        if (idx < 0 || idx >= scanCount) { Serial.println(F("bad index — run 'S' first")); break; }
+        addNetwork(scanSsids[idx], pw);
+        Serial.println(F("rebooting..."));
+        delay(300); ESP.restart();
+        break;
+      }
+      case 'W': {  // W<ssid>/<password> — join by literal name
+        String a = Serial.readStringUntil('\n'); a.trim();
+        int sl = a.indexOf('/');
+        if (sl < 1) { Serial.println(F("usage: W<ssid>/<password>")); break; }
+        addNetwork(a.substring(0, sl), a.substring(sl + 1));
+        Serial.println(F("rebooting..."));
+        delay(300); ESP.restart();
+        break;
+      }
       case 'i': Serial.printf("wifi=%d ota=%d ip=%s\n", wifiUp, otaUp,
                               wifiUp ? WiFi.localIP().toString().c_str() : "-"); break;
       case '?': printHelp(); break;
@@ -306,7 +421,7 @@ void loop() {
   }
 
   if (otaUp)  ArduinoOTA.handle();
-  if (wifiUp) server.handleClient();
+  if (wifiUp || apMode) server.handleClient();
 
   uint32_t now = millis();
 
