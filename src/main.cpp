@@ -291,6 +291,7 @@ static String statusJson() {
   float greenOhms = dividerOhms(PIN_GREEN, greenMv);
   String j = "{";
   j += "\"fw\":\"" + String(FW_BUILD) + "\",";
+  j += "\"uptime_s\":" + String(millis() / 1000) + ",";
   j += "\"ntc1_mv\":" + String(ntcMv) + ",\"ntc1_ohm\":" + String(ntcOhms, 1);
   j += ",\"green_mv\":" + String(greenMv) + ",\"green_ohm\":" + String(greenOhms, 1);
   j += ",\"float\":" + String(digitalRead(PIN_FLOAT));
