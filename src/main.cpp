@@ -73,6 +73,7 @@ static volatile uint32_t flowPulses = 0;
 static uint32_t          lastFlowSnapshot = 0;
 static uint32_t          lastTelemetryMs  = 0;
 static bool              unsafeAllowDryPump = false;
+static String            lineBuf;
 
 static void IRAM_ATTR onFlowPulse() { flowPulses++; }
 
@@ -131,7 +132,7 @@ static void printHelp() {
   Serial.println(F("  L       : list stored networks"));
   Serial.println(F("  i       : wifi/OTA/IP info"));
   Serial.println(F("  ?       : this help"));
-  Serial.println(F("Loads auto-off after 15s with no command (watchdog).\n"));
+  Serial.println(F("Every command needs Enter. Loads auto-off after 15s (watchdog).\n"));
 }
 
 static void telemetry() {
@@ -380,9 +381,28 @@ void setup() {
 }
 
 void loop() {
+  // Line-buffered, so a command is only acted on once the whole line has
+  // arrived. Reading the argument inline instead raced the operator's typing:
+  // the stream timeout expired mid-password and stored a truncated one.
+  // Requiring Enter also means a stray keystroke can no longer switch a load.
   while (Serial.available()) {
     char c = (char)Serial.read();
-    switch (c) {
+    if (c == '\r') continue;
+    if (c != '\n') {
+      if (lineBuf.length() < 160) lineBuf += c;
+      continue;
+    }
+
+    String line = lineBuf;
+    lineBuf = "";
+    line.trim();
+    if (line.isEmpty()) continue;
+
+    char   cmd = line.charAt(0);
+    String arg = line.substring(1);
+    arg.trim();
+
+    switch (cmd) {
       case 'h': setLoad(0, !loads[0].on); break;
       case 'p': setLoad(1, !loads[1].on); break;
       case 'g': setLoad(2, !loads[2].on); break;
@@ -393,30 +413,42 @@ void loop() {
       case 'U': unsafeAllowDryPump = true; Serial.println(F("dry-pump override ARMED")); break;
       case 'S': wifiScan(); break;
       case 'L': listNetworks(); break;
-      case 'C': {  // C<index>/<password> — join a network from the last scan
-        String a = Serial.readStringUntil('\n'); a.trim();
-        int sl = a.indexOf('/');
-        int idx = (sl < 0) ? a.toInt() : a.substring(0, sl).toInt();
-        String pw = (sl < 0) ? "" : a.substring(sl + 1);
-        if (idx < 0 || idx >= scanCount) { Serial.println(F("bad index — run 'S' first")); break; }
+
+      case 'C': {  // C<index>/<password>
+        int sl = arg.indexOf('/');
+        int idx = (sl < 0) ? arg.toInt() : arg.substring(0, sl).toInt();
+        String pw = (sl < 0) ? "" : arg.substring(sl + 1);
+        if (idx < 0 || idx >= scanCount) { Serial.println(F("bad index - run S first")); break; }
+        Serial.printf("joining \"%s\" with a %d-character password\n",
+                      scanSsids[idx].c_str(), pw.length());
         addNetwork(scanSsids[idx], pw);
         Serial.println(F("rebooting..."));
         delay(300); ESP.restart();
         break;
       }
-      case 'W': {  // W<ssid>/<password> — join by literal name
-        String a = Serial.readStringUntil('\n'); a.trim();
-        int sl = a.indexOf('/');
+
+      case 'W': {  // W<ssid>/<password>
+        int sl = arg.indexOf('/');
         if (sl < 1) { Serial.println(F("usage: W<ssid>/<password>")); break; }
-        addNetwork(a.substring(0, sl), a.substring(sl + 1));
+        String ss = arg.substring(0, sl), pw = arg.substring(sl + 1);
+        // Echo the length, never the password: catches a truncated paste
+        // without putting the secret in the scrollback.
+        Serial.printf("joining \"%s\" with a %d-character password\n",
+                      ss.c_str(), pw.length());
+        addNetwork(ss, pw);
         Serial.println(F("rebooting..."));
         delay(300); ESP.restart();
         break;
       }
-      case 'i': Serial.printf("wifi=%d ota=%d ip=%s\n", wifiUp, otaUp,
-                              wifiUp ? WiFi.localIP().toString().c_str() : "-"); break;
+
+      case 'i':
+        Serial.printf("wifi=%d ota=%d ap=%d ip=%s\n", wifiUp, otaUp, apMode,
+                      wifiUp   ? WiFi.localIP().toString().c_str()
+                      : apMode ? WiFi.softAPIP().toString().c_str() : "-");
+        break;
+
       case '?': printHelp(); break;
-      default: break;
+      default: Serial.printf("unknown command '%c' - try ?\n", cmd); break;
     }
   }
 
