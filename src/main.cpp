@@ -41,6 +41,10 @@ static const float VSUPPLY_MV  = 3300.0f;
 static const uint32_t CMD_WATCHDOG_MS = 15000;  // any load auto-offs if idle
 static const uint32_t TELEMETRY_MS    = 500;
 
+// Build stamp. Its whole job is to make an OTA push visibly land: read it back
+// from /status and a firmware that arrived over the air is proven, not assumed.
+static const char FW_BUILD[] = __DATE__ " " __TIME__;
+
 // Float polarity is OPEN BENCH TASK 3 — not yet confirmed which level means
 // "tank has water". Until characterized, the dry-pump guard refuses to run the
 // pump at all unless UNSAFE_ALLOW_DRY_PUMP is set at runtime ('U' command).
@@ -285,6 +289,7 @@ static String statusJson() {
   float ntcOhms   = dividerOhms(PIN_NTC1, ntcMv);
   float greenOhms = dividerOhms(PIN_GREEN, greenMv);
   String j = "{";
+  j += "\"fw\":\"" + String(FW_BUILD) + "\",";
   j += "\"ntc1_mv\":" + String(ntcMv) + ",\"ntc1_ohm\":" + String(ntcOhms, 1);
   j += ",\"green_mv\":" + String(greenMv) + ",\"green_ohm\":" + String(greenOhms, 1);
   j += ",\"float\":" + String(digitalRead(PIN_FLOAT));
@@ -374,7 +379,7 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(PIN_FLOW), onFlowPulse, FALLING);
 
-  Serial.println(F("\nzenith bench firmware up. All loads OFF."));
+  Serial.printf("\nzenith bench firmware up (build %s). All loads OFF.\n", FW_BUILD);
   startWifi();
   if (wifiUp || apMode) startWeb();
   printHelp();
