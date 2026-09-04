@@ -79,6 +79,8 @@ static uint32_t          lastFlowSnapshot = 0;
 static uint32_t          lastTelemetryMs  = 0;
 static bool              unsafeAllowDryPump = false;
 static String            lineBuf;
+static uint32_t          lastWifiTryMs = 0;
+static const uint32_t    WIFI_RETRY_MS = 30000;
 
 static void IRAM_ATTR onFlowPulse() { flowPulses++; }
 
@@ -228,6 +230,7 @@ static bool tryConnect(const String &ssid, const String &pass, uint32_t timeoutM
   Serial.printf("WiFi: trying \"%s\" ...", ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("zenith");
+  WiFi.setAutoReconnect(true);
   WiFi.begin(ssid.c_str(), pass.c_str());
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) {
@@ -285,6 +288,54 @@ static void startWifi() {
   startAP();
 }
 
+// Re-join without a cable. A single attempt at boot was not enough: the reboot
+// at the end of an OTA came back with the radio unhappy, and one failure meant
+// AP mode until someone power-cycled it. A router reboot would have done the
+// same. So keep trying, and climb back out of AP mode on our own.
+//
+// Only ever attempted with every load off. Reconnecting blocks for seconds, and
+// nothing that can switch mains should sit unattended inside a blocking call.
+static void wifiTick() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiUp) {
+      wifiUp = true;
+      Serial.print(F("WiFi: back up, IP = "));
+      Serial.println(WiFi.localIP());
+    }
+    return;
+  }
+  if (wifiUp) {
+    wifiUp = false;
+    Serial.println(F("WiFi: link lost"));
+  }
+
+  for (size_t i = 0; i < N_LOADS; i++)
+    if (loads[i].on) return;
+
+  if (millis() - lastWifiTryMs < WIFI_RETRY_MS) return;
+  lastWifiTryMs = millis();
+
+  prefs.begin("zenith", true);
+  int count = prefs.getInt("n", 0);
+  for (int i = 0; i < count && i < MAX_NETS; i++) {
+    String ss = prefs.getString(("ssid" + String(i)).c_str(), "");
+    String pp = prefs.getString(("pass" + String(i)).c_str(), "");
+    if (ss.isEmpty()) continue;
+    if (tryConnect(ss, pp, 10000)) {
+      prefs.end();
+      wifiUp = true;
+      apMode = false;
+      Serial.print(F("WiFi: reconnected, IP = "));
+      Serial.println(WiFi.localIP());
+      MDNS.begin("zenith");
+      if (!otaUp) startOta();
+      server.begin();
+      return;
+    }
+  }
+  prefs.end();
+}
+
 static String statusJson() {
   uint32_t ntcMv = 0, greenMv = 0;
   float ntcOhms   = dividerOhms(PIN_NTC1, ntcMv);
@@ -339,6 +390,8 @@ static void startWeb() {
       server.sendHeader("Connection", "close");
       server.send(200, "text/plain", Update.hasError() ? "FAIL\n" : "OK, rebooting\n");
       delay(400);
+      WiFi.disconnect(true);   // bring the radio down cleanly first
+      delay(200);
       ESP.restart();
     },
     []() {
@@ -486,6 +539,7 @@ void loop() {
     }
   }
 
+  wifiTick();
   if (otaUp)  ArduinoOTA.handle();
   if (wifiUp || apMode) server.handleClient();
 
