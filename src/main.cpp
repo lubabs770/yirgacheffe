@@ -329,7 +329,6 @@ static void wifiTick() {
       Serial.println(WiFi.localIP());
       MDNS.begin("zenith");
       if (!otaUp) startOta();
-      server.begin();
       return;
     }
   }
@@ -357,40 +356,22 @@ static String statusJson() {
   return j;
 }
 
+// Every route is registered once, unconditionally. Registering them per-mode
+// meant a board that booted into AP mode and only later found the network kept
+// serving the setup page forever -- including no /update, so the one bug that
+// stranded it was also the one bug OTA could not reach past.
 static void startWeb() {
-  if (apMode) {
-    server.on("/", []() {
-      String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
-                   "<title>zenith setup</title><style>body{font:16px system-ui;margin:2rem;max-width:28rem}"
-                   "select,input,button{font:inherit;padding:.5rem;width:100%;margin:.3rem 0}</style>"
-                   "<h1>zenith wifi setup</h1><form action=/save method=get><select name=ssid>");
-      for (int i = 0; i < scanCount; i++) h += "<option>" + scanSsids[i] + "</option>";
-      h += F("</select><input name=pass type=password placeholder='wifi password'>"
-             "<button>save &amp; reboot</button></form>");
-      server.send(200, "text/html", h);
-    });
-    server.on("/save", []() {
-      addNetwork(server.arg("ssid"), server.arg("pass"));
-      server.send(200, "text/html", F("<h1>saved</h1><p>rebooting, this page is done.</p>"));
-      delay(400);
-      ESP.restart();
-    });
-    server.begin();
-    return;
-  }
+  static bool started = false;
+  if (started) return;
+  started = true;
 
-  // HTTP OTA. ArduinoOTA (below) needs the board to dial back to the pushing
-  // machine, which a firewall on that machine silently drops -- and the whole
-  // point of OTA here is that it keeps working once USB is unreachable. A plain
-  // upload endpoint only ever receives, so it survives firewalls and works from
-  // anything that can POST.
   //   curl -F firmware=@firmware.bin http://zenith.local/update
   server.on("/update", HTTP_POST,
     []() {
       server.sendHeader("Connection", "close");
       server.send(200, "text/plain", Update.hasError() ? "FAIL\n" : "OK, rebooting\n");
       delay(400);
-      WiFi.disconnect(true);   // bring the radio down cleanly first
+      WiFi.disconnect(true);
       delay(200);
       ESP.restart();
     },
@@ -413,27 +394,50 @@ static void startWeb() {
   server.on("/set", []() {
     String name = server.arg("load");
     bool on = server.arg("on") == "1";
-    for (size_t i = 0; i < N_LOADS; i++) {
+    for (size_t i = 0; i < N_LOADS; i++)
       if (name == loads[i].name) { setLoad(i, on); break; }
-    }
     server.send(200, "application/json", statusJson());
   });
 
   server.on("/off", []() { allOff(); server.send(200, "application/json", statusJson()); });
 
+  // Reachable while connected too, so the next network can be stored in advance
+  // -- the machine moves, and by then the USB port is behind the joints.
+  server.on("/wifi", []() {
+    if (scanCount == 0) wifiScan();
+    String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
+                 "<title>zenith wifi</title><style>body{font:16px system-ui;margin:2rem;max-width:28rem}"
+                 "select,input,button{font:inherit;padding:.5rem;width:100%;margin:.3rem 0}</style>"
+                 "<h1>zenith wifi</h1><p>Up to 3 networks are remembered and tried at boot.</p>"
+                 "<form action=/save method=get><select name=ssid>");
+    for (int i = 0; i < scanCount; i++) h += "<option>" + scanSsids[i] + "</option>";
+    h += F("</select><input name=pass type=password placeholder='wifi password'>"
+           "<button>save &amp; reboot</button></form>");
+    server.send(200, "text/html", h);
+  });
+
+  server.on("/save", []() {
+    addNetwork(server.arg("ssid"), server.arg("pass"));
+    server.send(200, "text/html", F("<h1>saved</h1><p>rebooting.</p>"));
+    delay(400);
+    ESP.restart();
+  });
+
   server.on("/", []() {
+    if (apMode) { server.sendHeader("Location", "/wifi"); server.send(302, "text/plain", ""); return; }
     String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
                  "<title>zenith</title><style>body{font:16px system-ui;margin:2rem;max-width:34rem}"
-                 "button{font:inherit;padding:.6rem 1rem;margin:.2rem}pre{background:#eee;padding:1rem}</style>"
-                 "<h1>zenith bench</h1><div>");
+                 "button{font:inherit;padding:.6rem 1rem;margin:.2rem}pre{background:#eee;padding:1rem;"
+                 "overflow-x:auto}</style><h1>zenith bench</h1><div>");
     for (size_t i = 0; i < N_LOADS; i++) {
-      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=1').then(r)\">"
+      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=1')\">"
            + String(loads[i].name) + " ON</button>";
-      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=0').then(r)\">off</button><br>";
+      h += "<button onclick=\"fetch('/set?load=" + String(loads[i].name) + "&on=0')\">off</button><br>";
     }
-    h += F("</div><button onclick=\"fetch('/off').then(r)\">ALL OFF</button><pre id=s></pre>"
-           "<script>function r(){}setInterval(async()=>{"
-           "s.textContent=JSON.stringify(await (await fetch('/status')).json(),null,1)},500)</script>");
+    h += F("</div><button onclick=\"fetch('/off')\">ALL OFF</button>"
+           " <a href=/wifi>wifi</a><pre id=s></pre>"
+           "<script>setInterval(async()=>{s.textContent="
+           "JSON.stringify(await (await fetch('/status')).json(),null,1)},500)</script>");
     server.send(200, "text/html", h);
   });
 
@@ -463,7 +467,7 @@ void setup() {
 
   Serial.printf("\nzenith bench firmware up (build %s). All loads OFF.\n", FW_BUILD);
   startWifi();
-  if (wifiUp || apMode) startWeb();
+  startWeb();
   printHelp();
 }
 
@@ -541,7 +545,7 @@ void loop() {
 
   wifiTick();
   if (otaUp)  ArduinoOTA.handle();
-  if (wifiUp || apMode) server.handleClient();
+  server.handleClient();
 
   uint32_t now = millis();
 
