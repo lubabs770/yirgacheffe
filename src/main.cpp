@@ -80,6 +80,21 @@ static uint32_t          lastFlowSnapshot = 0;
 static uint32_t          lastTelemetryMs  = 0;
 static bool              unsafeAllowDryPump = false;
 static String            lineBuf;
+// Event ring. /status only ever shows this instant, so a switch flicked while
+// nobody was polling left no trace and read as a dead sensor. The board records
+// its own edges instead, which decouples wiring at the machine from watching
+// from anywhere: wire it, work it, read the log afterwards.
+static const int         LOG_N = 48;
+static String            logBuf[LOG_N];
+static int               logHead = 0;
+static uint32_t          logSeq  = 0;
+
+static void logEvent(const char *what, long value) {
+  logBuf[logHead] = String(++logSeq) + " " + String(millis() / 1000) + "s " + what + " " + String(value);
+  logHead = (logHead + 1) % LOG_N;
+  Serial.printf("EVENT %s %ld\n", what, value);
+}
+
 static uint32_t          lastWifiTryMs = 0;
 static const uint32_t    WIFI_RETRY_MS = 30000;
 
@@ -115,7 +130,7 @@ static void setLoad(size_t i, bool on) {
   l.on = on;
   l.lastCmdMs = millis();
   applyLoad(l);
-  Serial.printf("%s = %s\n", l.name, on ? "ON" : "off");
+  logEvent(l.name, on ? 1 : 0);
 }
 
 // Read a divider pin and report both the raw millivolts and the implied
@@ -141,6 +156,31 @@ static void printHelp() {
   Serial.println(F("  i       : wifi/OTA/IP info"));
   Serial.println(F("  ?       : this help"));
   Serial.println(F("Every command needs Enter. Loads auto-off after 15s (watchdog).\n"));
+}
+
+// Sampled every telemetry tick. Digital inputs are logged on every edge; the
+// dividers only when they move enough to mean something, so a floating pin's
+// noise cannot flood the ring and bury a real event.
+static void sampleForLog() {
+  static int  lastFloat = -1, lastCover = -1;
+  static long lastNtc = -1, lastGreen = -1;
+  static uint32_t lastFlow = 0;
+
+  int f = digitalRead(PIN_FLOAT);
+  if (f != lastFloat) { lastFloat = f; logEvent("float", f); }
+
+  int c = digitalRead(PIN_COVER_LIMIT);
+  if (c != lastCover) { lastCover = c; logEvent("cover_limit", c); }
+
+  uint32_t fl = flowPulses;
+  if (fl - lastFlow >= 20) { logEvent("flow_pulses", fl); lastFlow = fl; }
+
+  uint32_t mv;
+  long r = (long)dividerOhms(PIN_NTC1, mv);
+  if (lastNtc < 0 || labs(r - lastNtc) > lastNtc / 5) { lastNtc = r; logEvent("ntc1_ohm", r); }
+
+  r = (long)dividerOhms(PIN_GREEN, mv);
+  if (lastGreen < 0 || labs(r - lastGreen) > lastGreen / 5) { lastGreen = r; logEvent("green_ohm", r); }
 }
 
 static void telemetry() {
@@ -433,6 +473,21 @@ static void startWeb() {
     Serial.printf("pull OTA failed (%d): %s\n", (int)r, httpUpdate.getLastErrorString().c_str());
   });
 
+  // Oldest first, newest last. ?since=<seq> returns only what is new, so a
+  // watcher can poll without re-reading the whole ring.
+  server.on("/log", []() {
+    uint32_t since = server.arg("since").toInt();
+    String out;
+    for (int i = 0; i < LOG_N; i++) {
+      const String &e = logBuf[(logHead + i) % LOG_N];
+      if (e.isEmpty()) continue;
+      if (since && (uint32_t)e.substring(0, e.indexOf(' ')).toInt() <= since) continue;
+      out += e + "\n";
+    }
+    out += "seq " + String(logSeq) + "\n";
+    server.send(200, "text/plain", out);
+  });
+
   server.on("/status", []() { server.send(200, "application/json", statusJson()); });
 
   server.on("/set", []() {
@@ -607,6 +662,7 @@ void loop() {
 
   if (now - lastTelemetryMs >= TELEMETRY_MS) {
     lastTelemetryMs = now;
+    sampleForLog();
     telemetry();
   }
 }
