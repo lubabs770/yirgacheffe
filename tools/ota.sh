@@ -21,9 +21,15 @@ gh run download "$RID" -n firmware -D build
 
 MD5=$(md5sum build/firmware.bin | cut -d' ' -f1)
 echo "firmware md5 $MD5"
-echo "before: $(curl -s --max-time 15 "$HOST/status" | grep -o '"fw":"[^"]*"' || echo unreachable)"
 
-# Serve the image on the LAN so the board can pull it.
+stamp() { curl -s --max-time 15 "$HOST/status" 2>/dev/null | grep -o '"fw":"[^"]*"' || true; }
+BEFORE=$(stamp)
+echo "before: ${BEFORE:-unreachable}"
+
+# Serve the image on the LAN so the board can pull it. The server must outlive
+# the download: the board keeps answering /status while it fetches and only
+# reboots at the end, so treating a reachable /status as success killed the
+# transfer half way through.
 python3 -m http.server 8000 --directory build --bind 0.0.0.0 >/dev/null 2>&1 &
 SRV=$!
 trap 'kill $SRV 2>/dev/null || true' EXIT
@@ -32,15 +38,14 @@ sleep 1
 LANIP=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1)
 curl -s --max-time 20 "$HOST/pull?url=http://$LANIP:8000/firmware.bin" || true
 
+# Success is the build stamp changing, not the board merely answering.
 for _ in $(seq 1 40); do
-  # The tailnet hop is slower than the LAN; a short timeout here reported
-  # failure for updates that had actually landed.
-  R=$(curl -s --max-time 15 "$HOST/status" 2>/dev/null || true)
-  if grep -q uptime_s <<<"$R"; then
-    echo "after:  $(grep -o '"fw":"[^"]*"' <<<"$R")"
+  sleep 5
+  NOW=$(stamp)
+  if [[ -n "$NOW" && "$NOW" != "$BEFORE" ]]; then
+    echo "after:  $NOW"
     exit 0
   fi
-  sleep 4
 done
-echo "board did not come back within ~10 minutes" >&2
+echo "firmware stamp never changed -- update did not land" >&2
 exit 1
