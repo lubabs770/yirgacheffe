@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Build on CI, then install it on the board.
+#
+#   tools/ota.sh                 # local LAN, via zenith.local
+#   tools/ota.sh --remote        # from anywhere on the tailnet, via omarchy
+#
+# Defaults to pull mode: the board fetches the image itself, which survives a
+# marginal link far better than pushing into it. Push mode is kept as a
+# fallback and always sends an md5, without which the board refuses the image.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+HOST="http://zenith.local"
+[[ "${1:-}" == "--remote" ]] && HOST="http://omarchy.tail67aa85.ts.net:8080"
+
+RID=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+echo "waiting on CI run $RID..."
+gh run watch "$RID" --exit-status >/dev/null
+rm -rf build && mkdir -p build
+gh run download "$RID" -n firmware -D build
+
+MD5=$(md5sum build/firmware.bin | cut -d' ' -f1)
+echo "firmware md5 $MD5"
+
+stamp() { curl -s --max-time 15 "$HOST/status" 2>/dev/null | grep -o '"fw":"[^"]*"' || true; }
+BEFORE=$(stamp)
+echo "before: ${BEFORE:-unreachable}"
+
+# Serve the image on the LAN so the board can pull it. The server must outlive
+# the download: the board keeps answering /status while it fetches and only
+# reboots at the end, so treating a reachable /status as success killed the
+# transfer half way through.
+python3 -m http.server 8000 --directory build --bind 0.0.0.0 >/dev/null 2>&1 &
+SRV=$!
+trap 'kill $SRV 2>/dev/null || true' EXIT
+sleep 1
+
+LANIP=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1)
+curl -s --max-time 20 "$HOST/pull?url=http://$LANIP:8000/firmware.bin" || true
+
+# Success is the build stamp changing, not the board merely answering.
+for _ in $(seq 1 40); do
+  sleep 5
+  NOW=$(stamp)
+  if [[ -n "$NOW" && "$NOW" != "$BEFORE" ]]; then
+    echo "after:  $NOW"
+    exit 0
+  fi
+done
+echo "firmware stamp never changed -- update did not land" >&2
+exit 1

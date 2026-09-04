@@ -43,6 +43,7 @@ real-time loop and fails safe if the stream drops. Full design in
 | `docs/cover-dc.*` | **Steam cover, Option B — motor is DC.** Use if the AA tap gave a kick |
 | `docs/cover-relay.*` | Steam-cover relay overview (both options side by side) |
 | `docs/architecture.md` | Two-tier roadmap: Pi-on-top + real-time streamed control |
+| `docs/remote-ota.md` | Remote bench workflow: OTA, the tailnet bridge, `/log`, USB recovery |
 
 Firmware (PlatformIO `platformio.ini` + `src/main.cpp`) is planned but not yet
 committed here.
