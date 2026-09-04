@@ -343,6 +343,11 @@ static String statusJson() {
   String j = "{";
   j += "\"fw\":\"" + String(FW_BUILD) + "\",";
   j += "\"uptime_s\":" + String(millis() / 1000) + ",";
+  // RSSI is here to be watched while the board is physically positioned: the
+  // link is marginal and the antenna ends up next to metal, so the mounting
+  // spot wants picking by reading rather than by guessing.
+  j += "\"rssi\":" + String(wifiUp ? WiFi.RSSI() : 0) + ",";
+  j += "\"heap\":" + String(ESP.getFreeHeap()) + ",";
   j += "\"ntc1_mv\":" + String(ntcMv) + ",\"ntc1_ohm\":" + String(ntcOhms, 1);
   j += ",\"green_mv\":" + String(greenMv) + ",\"green_ohm\":" + String(greenOhms, 1);
   j += ",\"float\":" + String(digitalRead(PIN_FLOAT));
