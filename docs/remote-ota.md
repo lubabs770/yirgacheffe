@@ -27,7 +27,7 @@ is watching no longer have to coordinate timing over text.
 ## Reaching it
 
 - On the same LAN: `http://zenith.local/`
-- From anywhere on the tailnet: `http://omarchy.tail67aa85.ts.net:8080/`
+- From anywhere on the tailnet: the URL in `tools/link.env` (see `link.env.example`)
 
 The tailnet path is a `systemd --user` unit, `zenith-bridge.service`, running
 `tools/zenith-link.sh` and published by `tailscale serve --http=8080`.
@@ -36,10 +36,10 @@ That script keeps `127.0.0.1:8099` pointed at the board wherever it is:
 
 - **Board on this LAN** — a direct `socat` hop to `zenith.local:80`, re-resolved
   per connection, so a DHCP renewal changes nothing.
-- **Board somewhere else** — an SSH tunnel through the Moto, which sits on the
-  board's home LAN and is reachable over the tailnet. The phone finds the board
-  by sweeping its own subnet for a live `/status` (a full /24 takes ~15s; the
-  last hit is cached and tried first).
+- **Board somewhere else** — an SSH tunnel through a phone that sits on the
+  board's LAN and is reachable over the tailnet, configured in `tools/link.env`.
+  It finds the board by sweeping its own subnet for a live `/status` (a full /24
+  takes ~15s; the last hit is cached and tried first).
 
 Either way the published URL is identical, so nothing downstream has to know
 which case is in play.
@@ -81,7 +81,9 @@ bootloader is pointed at the other app slot, so writing to `0x10000` alone
 appears to succeed and then boots the old firmware anyway.
 
 If the board cannot find a known network it raises its own AP, `zenith-setup`
-(password `zenith1234`), and serves the setup page — recovery with no cable at
+(password `zenith1234` — change `AP_PASS` before this lives anywhere public,
+since anyone in radio range who knows it can rewrite the board's WiFi), and
+serves the setup page — recovery with no cable at
 all. It remembers three networks and tries each at boot.
 
 ## Known gaps

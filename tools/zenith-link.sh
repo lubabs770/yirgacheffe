@@ -8,9 +8,13 @@
 # published URL never changes.
 set -uo pipefail
 
+# Site-specific values live outside the repo so no personal network topology is
+# committed. Copy tools/link.env.example to tools/link.env and fill it in.
+[ -f "$(dirname "$0")/link.env" ] && . "$(dirname "$0")/link.env"
+
 PORT="${ZENITH_PORT:-8099}"
-PHONE_USER="${PHONE_USER:-u0_a168}"
-PHONE_HOST="${PHONE_HOST:-100.79.207.105}"
+PHONE_USER="${PHONE_USER:-}"
+PHONE_HOST="${PHONE_HOST:-}"
 PHONE_PORT="${PHONE_PORT:-8022}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/zenith-last-ip"
 
@@ -50,6 +54,11 @@ while true; do
     socat "TCP-LISTEN:$PORT,fork,reuseaddr,bind=127.0.0.1" TCP:zenith.local:80
     log "direct hop ended"
   else
+    if [ -z "$PHONE_HOST" ]; then
+      log "board not on this LAN and no PHONE_HOST configured; retrying in 30s"
+      sleep 30
+      continue
+    fi
     log "board not on this LAN, looking for it via the phone"
     IP=$(discover_via_phone)
     if [ -z "$IP" ]; then

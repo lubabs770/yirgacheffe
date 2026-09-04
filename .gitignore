@@ -1,2 +1,7 @@
 .pio/
 build/
+
+# exported Claude transcripts -- personal context, never publish
+bitedust.md
+*.transcript.md
+tools/link.env

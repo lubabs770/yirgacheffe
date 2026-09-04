@@ -11,7 +11,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 HOST="http://zenith.local"
-[[ "${1:-}" == "--remote" ]] && HOST="http://omarchy.tail67aa85.ts.net:8080"
+[ -f "$(dirname "$0")/link.env" ] && . "$(dirname "$0")/link.env"
+[[ "${1:-}" == "--remote" ]] && HOST="${ZENITH_REMOTE_URL:?set ZENITH_REMOTE_URL in tools/link.env}"
 
 RID=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
 echo "waiting on CI run $RID..."
