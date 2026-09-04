@@ -19,6 +19,7 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #include <Update.h>
+#include <HTTPUpdate.h>
 
 // ---------------------------------------------------------------- pin map
 // Matches wiring.md. GPIO34/35/39 are input-only (no internal pullup).
@@ -369,7 +370,11 @@ static void startWeb() {
   server.on("/update", HTTP_POST,
     []() {
       server.sendHeader("Connection", "close");
-      server.send(200, "text/plain", Update.hasError() ? "FAIL\n" : "OK, rebooting\n");
+      bool ok = !Update.hasError() && Update.isFinished();
+      server.sendHeader("Connection", "close");
+      server.send(ok ? 200 : 500, "text/plain",
+                  ok ? "OK, verified, rebooting\n" : "FAIL, flash left on the old image\n");
+      if (!ok) return;                  // a rejected image must not trigger a reboot
       delay(400);
       WiFi.disconnect(true);
       delay(200);
@@ -380,14 +385,48 @@ static void startWeb() {
       if (up.status == UPLOAD_FILE_START) {
         allOff();                       // never swap firmware with a load live
         Serial.printf("HTTP OTA: receiving %s\n", up.filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { Update.printError(Serial); return; }
+        // Without an expected checksum a truncated upload is still marked
+        // bootable, and the board reboots into a half-written image that only
+        // a USB cable can undo. That is unrecoverable from another town, so
+        // the checksum is mandatory rather than advisory.
+        String md5 = server.arg("md5");
+        if (md5.length() == 32) {
+          Update.setMD5(md5.c_str());
+          Serial.printf("HTTP OTA: expecting md5 %s\n", md5.c_str());
+        } else {
+          Serial.println(F("HTTP OTA: REFUSED, no ?md5= given"));
+          Update.abort();
+        }
       } else if (up.status == UPLOAD_FILE_WRITE) {
-        if (Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
+        if (Update.isRunning() && Update.write(up.buf, up.currentSize) != up.currentSize)
+          Update.printError(Serial);
       } else if (up.status == UPLOAD_FILE_END) {
-        if (Update.end(true)) Serial.printf("HTTP OTA: %u bytes, rebooting\n", up.totalSize);
+        // end() checks the md5 and refuses to mark a mismatched image bootable.
+        if (Update.end(true)) Serial.printf("HTTP OTA: %u bytes verified, rebooting\n", up.totalSize);
         else Update.printError(Serial);
+      } else if (up.status == UPLOAD_FILE_ABORTED) {
+        Update.abort();
+        Serial.println(F("HTTP OTA: aborted, flash left untouched"));
       }
     });
+
+  // Pull instead of push. The board drives the transfer, so a slow or stuttering
+  // link stalls it rather than truncating it, and HTTPUpdate checks the length
+  // it was promised. Over a marginal link this is the one that works.
+  //   curl "http://zenith.local/pull?url=http://192.168.1.163:8000/firmware.bin"
+  server.on("/pull", []() {
+    String url = server.arg("url");
+    if (url.isEmpty()) { server.send(400, "text/plain", "need ?url=\n"); return; }
+    server.send(200, "text/plain", "pulling, watch /status for a new fw stamp\n");
+    allOff();
+    Serial.printf("pull OTA from %s\n", url.c_str());
+    WiFiClient client;
+    httpUpdate.rebootOnUpdate(true);
+    t_httpUpdate_return r = httpUpdate.update(client, url);
+    // Only returns when it did NOT reboot, i.e. it failed.
+    Serial.printf("pull OTA failed (%d): %s\n", (int)r, httpUpdate.getLastErrorString().c_str());
+  });
 
   server.on("/status", []() { server.send(200, "application/json", statusJson()); });
 
@@ -404,7 +443,10 @@ static void startWeb() {
   // Reachable while connected too, so the next network can be stored in advance
   // -- the machine moves, and by then the USB port is behind the joints.
   server.on("/wifi", []() {
-    if (scanCount == 0) wifiScan();
+    // Scanning briefly drops the station link. Doing that on request from a
+    // remote client can knock the board off the network it was reached on, so
+    // only scan when there is no link to lose, or when explicitly asked.
+    if (scanCount == 0 && (apMode || server.arg("scan") == "1")) wifiScan();
     String h = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
                  "<title>zenith wifi</title><style>body{font:16px system-ui;margin:2rem;max-width:28rem}"
                  "select,input,button{font:inherit;padding:.5rem;width:100%;margin:.3rem 0}</style>"

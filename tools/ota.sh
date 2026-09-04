@@ -1,29 +1,44 @@
 #!/usr/bin/env bash
-# Build on CI, then push the result to the board over the air.
-#   tools/ota.sh [host]      host defaults to zenith.local, falls back to the IP
+# Build on CI, then install it on the board.
+#
+#   tools/ota.sh                 # local LAN, via zenith.local
+#   tools/ota.sh --remote        # from anywhere on the tailnet, via omarchy
+#
+# Defaults to pull mode: the board fetches the image itself, which survives a
+# marginal link far better than pushing into it. Push mode is kept as a
+# fallback and always sends an md5, without which the board refuses the image.
 set -euo pipefail
-HOST="${1:-zenith.local}"
 cd "$(dirname "$0")/.."
 
-echo "waiting for CI build of $(git rev-parse --short HEAD)..."
-RID=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
-gh run watch "$RID" --exit-status >/dev/null
+HOST="http://zenith.local"
+[[ "${1:-}" == "--remote" ]] && HOST="http://omarchy.tail67aa85.ts.net:8080"
 
+RID=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+echo "waiting on CI run $RID..."
+gh run watch "$RID" --exit-status >/dev/null
 rm -rf build && mkdir -p build
 gh run download "$RID" -n firmware -D build
 
-BEFORE=$(curl -s --max-time 5 "http://$HOST/status" | grep -o '"fw":"[^"]*"' || echo "unreachable")
-echo "before: $BEFORE"
+MD5=$(md5sum build/firmware.bin | cut -d' ' -f1)
+echo "firmware md5 $MD5"
+echo "before: $(curl -s --max-time 5 "$HOST/status" | grep -o '"fw":"[^"]*"' || echo unreachable)"
 
-curl -s --max-time 180 -F "firmware=@build/firmware.bin" "http://$HOST/update"
+# Serve the image on the LAN so the board can pull it.
+python3 -m http.server 8000 --directory build --bind 0.0.0.0 >/dev/null 2>&1 &
+SRV=$!
+trap 'kill $SRV 2>/dev/null || true' EXIT
+sleep 1
 
-for _ in $(seq 1 30); do
-  R=$(curl -s --max-time 3 "http://$HOST/status" 2>/dev/null || true)
+LANIP=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1)
+curl -s --max-time 20 "$HOST/pull?url=http://$LANIP:8000/firmware.bin" || true
+
+for _ in $(seq 1 40); do
+  R=$(curl -s --max-time 3 "$HOST/status" 2>/dev/null || true)
   if grep -q uptime_s <<<"$R"; then
     echo "after:  $(grep -o '"fw":"[^"]*"' <<<"$R")"
     exit 0
   fi
   sleep 4
 done
-echo "board did not come back within 2 minutes" >&2
+echo "board did not come back within ~3 minutes" >&2
 exit 1
