@@ -21,7 +21,7 @@ gh run download "$RID" -n firmware -D build
 
 MD5=$(md5sum build/firmware.bin | cut -d' ' -f1)
 echo "firmware md5 $MD5"
-echo "before: $(curl -s --max-time 5 "$HOST/status" | grep -o '"fw":"[^"]*"' || echo unreachable)"
+echo "before: $(curl -s --max-time 15 "$HOST/status" | grep -o '"fw":"[^"]*"' || echo unreachable)"
 
 # Serve the image on the LAN so the board can pull it.
 python3 -m http.server 8000 --directory build --bind 0.0.0.0 >/dev/null 2>&1 &
@@ -33,12 +33,14 @@ LANIP=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head 
 curl -s --max-time 20 "$HOST/pull?url=http://$LANIP:8000/firmware.bin" || true
 
 for _ in $(seq 1 40); do
-  R=$(curl -s --max-time 3 "$HOST/status" 2>/dev/null || true)
+  # The tailnet hop is slower than the LAN; a short timeout here reported
+  # failure for updates that had actually landed.
+  R=$(curl -s --max-time 15 "$HOST/status" 2>/dev/null || true)
   if grep -q uptime_s <<<"$R"; then
     echo "after:  $(grep -o '"fw":"[^"]*"' <<<"$R")"
     exit 0
   fi
   sleep 4
 done
-echo "board did not come back within ~3 minutes" >&2
+echo "board did not come back within ~10 minutes" >&2
 exit 1
