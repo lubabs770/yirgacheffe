@@ -1,21 +1,42 @@
 #!/usr/bin/env bash
-# Build on CI, then install it on the board.
+# Build the checked-out tree on CI, then install it on the board.
 #
-#   tools/ota.sh                 # local LAN, via zenith.local
-#   tools/ota.sh --remote        # from anywhere on the tailnet, via omarchy
+#   tools/ota.sh                 # board on this LAN
+#   tools/ota.sh --remote        # board reachable over the tailnet link
 #
-# Defaults to pull mode: the board fetches the image itself, which survives a
-# marginal link far better than pushing into it. Push mode is kept as a
-# fallback and always sends an md5, without which the board refuses the image.
+# Whatever is committed locally is published to the build branch, which is the
+# only branch CI watches -- master is deliberately excluded so that merging never
+# kicks off a build. The run is then matched by commit sha rather than by "most
+# recent", because picking the latest run once grabbed a different commit's
+# artifact and flashed the wrong firmware.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HOST="http://zenith.local"
 [ -f "$(dirname "$0")/link.env" ] && . "$(dirname "$0")/link.env"
+
+BUILD_BRANCH="${ZENITH_BUILD_BRANCH:-build}"
+HOST="http://zenith.local"
 [[ "${1:-}" == "--remote" ]] && HOST="${ZENITH_REMOTE_URL:?set ZENITH_REMOTE_URL in tools/link.env}"
 
-RID=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
-echo "waiting on CI run $RID..."
+SHA=$(git rev-parse HEAD)
+if [ -n "$(git status --porcelain)" ]; then
+  echo "working tree is dirty -- commit before flashing, or you will not know what is on the board" >&2
+  exit 1
+fi
+
+echo "publishing $(git rev-parse --short HEAD) to $BUILD_BRANCH"
+git push -f -q origin "HEAD:$BUILD_BRANCH"
+
+echo "waiting for the CI run for this commit..."
+RID=""
+for _ in $(seq 1 60); do
+  RID=$(gh run list --branch "$BUILD_BRANCH" --limit 10 \
+        --json databaseId,headSha -q ".[] | select(.headSha==\"$SHA\") | .databaseId" | head -1)
+  [ -n "$RID" ] && break
+  sleep 5
+done
+[ -z "$RID" ] && { echo "no CI run appeared for $SHA" >&2; exit 1; }
+
 gh run watch "$RID" --exit-status >/dev/null
 rm -rf build && mkdir -p build
 gh run download "$RID" -n firmware -D build
