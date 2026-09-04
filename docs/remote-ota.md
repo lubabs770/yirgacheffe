@@ -30,12 +30,28 @@ is watching no longer have to coordinate timing over text.
 - From anywhere on the tailnet: `http://omarchy.tail67aa85.ts.net:8080/`
 
 The tailnet path is a `systemd --user` unit, `zenith-bridge.service`, running
-`socat` from `127.0.0.1:8099` to `zenith.local:80`, published by
-`tailscale serve --http=8080`. socat re-resolves the name on every connection,
-so the board's DHCP lease can change — or the whole setup can move to another
-building — without touching anything. Verified on 2026-09-03 by moving both
-machines to a different LAN: the board came back at a new IP and both paths
-worked with no changes.
+`tools/zenith-link.sh` and published by `tailscale serve --http=8080`.
+
+That script keeps `127.0.0.1:8099` pointed at the board wherever it is:
+
+- **Board on this LAN** — a direct `socat` hop to `zenith.local:80`, re-resolved
+  per connection, so a DHCP renewal changes nothing.
+- **Board somewhere else** — an SSH tunnel through the Moto, which sits on the
+  board's home LAN and is reachable over the tailnet. The phone finds the board
+  by sweeping its own subnet for a live `/status` (a full /24 takes ~15s; the
+  last hit is cached and tried first).
+
+Either way the published URL is identical, so nothing downstream has to know
+which case is in play.
+
+Verified 2026-09-03 by moving both machines to a different LAN: the board came
+back at a new IP and both paths worked with no changes.
+
+**The tunnel costs you USB recovery.** With the board in one building and the
+laptop in another, a firmware that will not boot cannot be fixed until they are
+back together. The mandatory `?md5=` closes the failure that actually bit us,
+but prefer keeping the laptop and the board in the same bag when there is real
+flashing to do.
 
 ## Updating firmware
 
