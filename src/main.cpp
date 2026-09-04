@@ -105,8 +105,12 @@ static void applyLoad(Load &l) {
   digitalWrite(l.pin, (l.on != l.activeLow) ? HIGH : LOW);
 }
 
+// Logged per load that was actually on. /off is the stop-everything control and
+// the watchdog is what catches a dropped link, so both have to leave a trace --
+// they are exactly the events worth reading back after something went wrong.
 static void allOff() {
   for (size_t i = 0; i < N_LOADS; i++) {
+    if (loads[i].on) logEvent(loads[i].name, 0);
     loads[i].on = false;
     applyLoad(loads[i]);
   }
@@ -175,12 +179,22 @@ static void sampleForLog() {
   uint32_t fl = flowPulses;
   if (fl - lastFlow >= 20) { logEvent("flow_pulses", fl); lastFlow = fl; }
 
+  // An unconnected divider pin swings wildly, and at two samples a second that
+  // buries every switch edge in the ring within seconds. Analog entries are
+  // rate-limited so the log stays readable until the sensors are actually wired.
+  static uint32_t lastAnalogLog = 0;
+  if (millis() - lastAnalogLog < 5000) return;
+
   uint32_t mv;
   long r = (long)dividerOhms(PIN_NTC1, mv);
-  if (lastNtc < 0 || labs(r - lastNtc) > lastNtc / 5) { lastNtc = r; logEvent("ntc1_ohm", r); }
+  if (lastNtc < 0 || labs(r - lastNtc) > lastNtc / 4) {
+    lastNtc = r; lastAnalogLog = millis(); logEvent("ntc1_ohm", r);
+  }
 
   r = (long)dividerOhms(PIN_GREEN, mv);
-  if (lastGreen < 0 || labs(r - lastGreen) > lastGreen / 5) { lastGreen = r; logEvent("green_ohm", r); }
+  if (lastGreen < 0 || labs(r - lastGreen) > lastGreen / 4) {
+    lastGreen = r; lastAnalogLog = millis(); logEvent("green_ohm", r);
+  }
 }
 
 static void telemetry() {
@@ -656,7 +670,7 @@ void loop() {
     if (loads[i].on && (now - loads[i].lastCmdMs) > CMD_WATCHDOG_MS) {
       loads[i].on = false;
       applyLoad(loads[i]);
-      Serial.printf("watchdog: %s forced off\n", loads[i].name);
+      logEvent("watchdog_off", (long)i);
     }
   }
 
